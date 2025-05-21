@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "installCommand": "npm install --omit=dev",
+  "builds": [
+    {
+      "src": "index.mjs",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": [
+          "index.mjs",
+          "index2.mjs",
+          "instrumentation.mjs",
+          "mastra.mjs",
+          "package.json",
+          "pnpm-lock.yaml",
+          "telemetry-config.mjs",
+          "tools",
+          "tools.mjs",
+          "tools/29331ccf-bca1-4b49-9097-5c9eb2652359.mjs"
+        ]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "index.mjs"
+    }
+  ]
+}

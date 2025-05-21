@@ -1,0 +1,11 @@
+export { w as weatherTool } from '../mastra.mjs';
+import 'stream';
+import 'pino';
+import 'pino-pretty';
+import 'crypto';
+import 'path';
+import '@libsql/client';
+import 'fs';
+import 'node:fs/promises';
+import 'node:os';
+import 'node:path';

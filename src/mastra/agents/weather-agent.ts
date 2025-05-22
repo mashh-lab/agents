@@ -1,9 +1,7 @@
 import { google } from '@ai-sdk/google'
 import { Agent } from '@mastra/core/agent'
-import { Memory } from '@mastra/memory'
-import { UpstashStore } from '@mastra/upstash'
 import { weatherTool } from '../tools'
-import { getUpstashOptions } from '../utils'
+import { getMemory } from './memory'
 
 export const weatherAgent = new Agent({
   name: 'Weather Agent',
@@ -21,14 +19,5 @@ export const weatherAgent = new Agent({
 `,
   model: google('gemini-1.5-pro-latest'),
   tools: { weatherTool },
-  memory: new Memory({
-    storage: new UpstashStore(getUpstashOptions()),
-    options: {
-      lastMessages: 10,
-      semanticRecall: false,
-      threads: {
-        generateTitle: false,
-      },
-    },
-  }),
+  memory: getMemory(),
 })

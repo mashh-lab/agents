@@ -1,7 +1,7 @@
 import { UpstashStore, UpstashVector } from '@mastra/upstash'
 import { Memory } from '@mastra/memory'
 import { LibSQLStore } from '@mastra/libsql'
-
+import { google } from '@ai-sdk/google'
 
 export function getMemory() {
   return process.env.VERCEL ? getUpstashMemory() : getLocalMemory()
@@ -36,6 +36,7 @@ function getUpstashMemory() {
   return new Memory({
     storage: new UpstashStore(upstashStorageOptions),
     vector: new UpstashVector(upstashVectorOptions),
+    embedder: google.textEmbeddingModel('text-embedding-004'),
     options: {
       lastMessages: 10,
       semanticRecall: true,

@@ -30179,6 +30179,7 @@ function getUpstashMemory() {
   return new Memory({
     storage: new UpstashStore(upstashStorageOptions),
     vector: new UpstashVector(upstashVectorOptions),
+    embedder: google.textEmbeddingModel("text-embedding-004"),
     options: {
       lastMessages: 10,
       semanticRecall: true,

@@ -2693,6 +2693,206 @@ Mastra = /*@__PURE__*/(_ => {
   return Mastra;
 })();
 
+// src/base.ts
+var MastraBase = class {
+  component = RegisteredLogger.LLM;
+  logger;
+  name;
+  telemetry;
+  constructor({ component, name }) {
+    this.component = component || RegisteredLogger.LLM;
+    this.name = name;
+    this.logger = new ConsoleLogger({ name: `${this.component} - ${this.name}` });
+  }
+  /**
+   * Set the logger for the agent
+   * @param logger
+   */
+  __setLogger(logger) {
+    this.logger = logger;
+    if (this.component !== RegisteredLogger.LLM) {
+      this.logger.debug(`Logger updated [component=${this.component}] [name=${this.name}]`);
+    }
+  }
+  /**
+   * Set the telemetry for the
+   * @param telemetry
+   */
+  __setTelemetry(telemetry) {
+    this.telemetry = telemetry;
+    if (this.component !== RegisteredLogger.LLM) {
+      this.logger.debug(`Telemetry updated [component=${this.component}] [name=${this.telemetry.name}]`);
+    }
+  }
+  /**
+   * Get the telemetry on the vector
+   * @returns telemetry
+   */
+  __getTelemetry() {
+    return this.telemetry;
+  }
+  /* 
+    get experimental_telemetry config
+    */
+  get experimental_telemetry() {
+    return this.telemetry ? {
+      // tracer: this.telemetry.tracer,
+      tracer: this.telemetry.getBaggageTracer(),
+      isEnabled: !!this.telemetry.tracer
+    } : void 0;
+  }
+};
+
+// src/hooks/mitt.ts
+function mitt(all) {
+  all = all || /* @__PURE__ */ new Map();
+  return {
+    /**
+     * A Map of event names to registered handler functions.
+     */
+    all,
+    /**
+     * Register an event handler for the given type.
+     * @param {string|symbol} type Type of event to listen for, or `'*'` for all events
+     * @param {Function} handler Function to call in response to given event
+     * @memberOf mitt
+     */
+    on(type, handler) {
+      const handlers = all.get(type);
+      if (handlers) {
+        handlers.push(handler);
+      } else {
+        all.set(type, [handler]);
+      }
+    },
+    /**
+     * Remove an event handler for the given type.
+     * If `handler` is omitted, all handlers of the given type are removed.
+     * @param {string|symbol} type Type of event to unregister `handler` from (`'*'` to remove a wildcard handler)
+     * @param {Function} [handler] Handler function to remove
+     * @memberOf mitt
+     */
+    off(type, handler) {
+      const handlers = all.get(type);
+      if (handlers) {
+        if (handler) {
+          handlers.splice(handlers.indexOf(handler) >>> 0, 1);
+        } else {
+          all.set(type, []);
+        }
+      }
+    },
+    /**
+     * Invoke all handlers for the given type.
+     * If present, `'*'` handlers are invoked after type-matched handlers.
+     *
+     * Note: Manually firing '*' handlers is not supported.
+     *
+     * @param {string|symbol} type The event type to invoke
+     * @param {Any} [evt] Any value (object is recommended and powerful), passed to each handler
+     * @memberOf mitt
+     */
+    emit(type, evt) {
+      let handlers = all.get(type);
+      if (handlers) {
+        handlers.slice().map((handler) => {
+          handler(evt);
+        });
+      }
+      handlers = all.get("*");
+      if (handlers) {
+        handlers.slice().map((handler) => {
+          handler(type, evt);
+        });
+      }
+    }
+  };
+}
+
+// src/hooks/index.ts
+var AvailableHooks = /* @__PURE__ */ ((AvailableHooks2) => {
+  AvailableHooks2["ON_EVALUATION"] = "onEvaluation";
+  AvailableHooks2["ON_GENERATION"] = "onGeneration";
+  return AvailableHooks2;
+})(AvailableHooks || {});
+var hooks = mitt();
+function registerHook(hook, action) {
+  hooks.on(hook, action);
+}
+function executeHook(hook, data) {
+  setImmediate(() => {
+    hooks.emit(hook, data);
+  });
+}
+
+// src/runtime-context/index.ts
+var RuntimeContext = class {
+  registry = /* @__PURE__ */ new Map();
+  constructor(iterable) {
+    this.registry = new Map(iterable);
+  }
+  /**
+   * set a value with strict typing if `Values` is a Record and the key exists in it.
+   */
+  set(key, value) {
+    this.registry.set(key, value);
+  }
+  /**
+   * Get a value with its type
+   */
+  get(key) {
+    return this.registry.get(key);
+  }
+  /**
+   * Check if a key exists in the container
+   */
+  has(key) {
+    return this.registry.has(key);
+  }
+  /**
+   * Delete a value by key
+   */
+  delete(key) {
+    return this.registry.delete(key);
+  }
+  /**
+   * Clear all values from the container
+   */
+  clear() {
+    this.registry.clear();
+  }
+  /**
+   * Get all keys in the container
+   */
+  keys() {
+    return this.registry.keys();
+  }
+  /**
+   * Get all values in the container
+   */
+  values() {
+    return this.registry.values();
+  }
+  /**
+   * Get all entries in the container
+   */
+  entries() {
+    return this.registry.entries();
+  }
+  /**
+   * Get the size of the container
+   */
+  size() {
+    return this.registry.size;
+  }
+  /**
+   * Execute a function for each entry in the container
+   */
+  forEach(callbackfn) {
+    this.registry.forEach(callbackfn);
+  }
+};
+
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
 function getDefaultExportFromCjs (x) {
@@ -7921,1149 +8121,6 @@ const coerce = {
     date: ((arg) => ZodDate.create({ ...arg, coerce: true })),
 };
 const NEVER = INVALID;
-
-// src/google-provider.ts
-
-// src/convert-json-schema-to-openapi-schema.ts
-function convertJSONSchemaToOpenAPISchema(jsonSchema) {
-  if (isEmptyObjectSchema(jsonSchema)) {
-    return void 0;
-  }
-  if (typeof jsonSchema === "boolean") {
-    return { type: "boolean", properties: {} };
-  }
-  const {
-    type,
-    description,
-    required,
-    properties,
-    items,
-    allOf,
-    anyOf,
-    oneOf,
-    format,
-    const: constValue,
-    minLength,
-    enum: enumValues
-  } = jsonSchema;
-  const result = {};
-  if (description)
-    result.description = description;
-  if (required)
-    result.required = required;
-  if (format)
-    result.format = format;
-  if (constValue !== void 0) {
-    result.enum = [constValue];
-  }
-  if (type) {
-    if (Array.isArray(type)) {
-      if (type.includes("null")) {
-        result.type = type.filter((t) => t !== "null")[0];
-        result.nullable = true;
-      } else {
-        result.type = type;
-      }
-    } else if (type === "null") {
-      result.type = "null";
-    } else {
-      result.type = type;
-    }
-  }
-  if (enumValues !== void 0) {
-    result.enum = enumValues;
-  }
-  if (properties != null) {
-    result.properties = Object.entries(properties).reduce(
-      (acc, [key, value]) => {
-        acc[key] = convertJSONSchemaToOpenAPISchema(value);
-        return acc;
-      },
-      {}
-    );
-  }
-  if (items) {
-    result.items = Array.isArray(items) ? items.map(convertJSONSchemaToOpenAPISchema) : convertJSONSchemaToOpenAPISchema(items);
-  }
-  if (allOf) {
-    result.allOf = allOf.map(convertJSONSchemaToOpenAPISchema);
-  }
-  if (anyOf) {
-    if (anyOf.some(
-      (schema) => typeof schema === "object" && (schema == null ? void 0 : schema.type) === "null"
-    )) {
-      const nonNullSchemas = anyOf.filter(
-        (schema) => !(typeof schema === "object" && (schema == null ? void 0 : schema.type) === "null")
-      );
-      if (nonNullSchemas.length === 1) {
-        const converted = convertJSONSchemaToOpenAPISchema(nonNullSchemas[0]);
-        if (typeof converted === "object") {
-          result.nullable = true;
-          Object.assign(result, converted);
-        }
-      } else {
-        result.anyOf = nonNullSchemas.map(convertJSONSchemaToOpenAPISchema);
-        result.nullable = true;
-      }
-    } else {
-      result.anyOf = anyOf.map(convertJSONSchemaToOpenAPISchema);
-    }
-  }
-  if (oneOf) {
-    result.oneOf = oneOf.map(convertJSONSchemaToOpenAPISchema);
-  }
-  if (minLength !== void 0) {
-    result.minLength = minLength;
-  }
-  return result;
-}
-function isEmptyObjectSchema(jsonSchema) {
-  return jsonSchema != null && typeof jsonSchema === "object" && jsonSchema.type === "object" && (jsonSchema.properties == null || Object.keys(jsonSchema.properties).length === 0);
-}
-function convertToGoogleGenerativeAIMessages(prompt) {
-  var _a, _b;
-  const systemInstructionParts = [];
-  const contents = [];
-  let systemMessagesAllowed = true;
-  for (const { role, content } of prompt) {
-    switch (role) {
-      case "system": {
-        if (!systemMessagesAllowed) {
-          throw new UnsupportedFunctionalityError({
-            functionality: "system messages are only supported at the beginning of the conversation"
-          });
-        }
-        systemInstructionParts.push({ text: content });
-        break;
-      }
-      case "user": {
-        systemMessagesAllowed = false;
-        const parts = [];
-        for (const part of content) {
-          switch (part.type) {
-            case "text": {
-              parts.push({ text: part.text });
-              break;
-            }
-            case "image": {
-              parts.push(
-                part.image instanceof URL ? {
-                  fileData: {
-                    mimeType: (_a = part.mimeType) != null ? _a : "image/jpeg",
-                    fileUri: part.image.toString()
-                  }
-                } : {
-                  inlineData: {
-                    mimeType: (_b = part.mimeType) != null ? _b : "image/jpeg",
-                    data: convertUint8ArrayToBase64(part.image)
-                  }
-                }
-              );
-              break;
-            }
-            case "file": {
-              parts.push(
-                part.data instanceof URL ? {
-                  fileData: {
-                    mimeType: part.mimeType,
-                    fileUri: part.data.toString()
-                  }
-                } : {
-                  inlineData: {
-                    mimeType: part.mimeType,
-                    data: part.data
-                  }
-                }
-              );
-              break;
-            }
-          }
-        }
-        contents.push({ role: "user", parts });
-        break;
-      }
-      case "assistant": {
-        systemMessagesAllowed = false;
-        contents.push({
-          role: "model",
-          parts: content.map((part) => {
-            switch (part.type) {
-              case "text": {
-                return part.text.length === 0 ? void 0 : { text: part.text };
-              }
-              case "file": {
-                if (part.mimeType !== "image/png") {
-                  throw new UnsupportedFunctionalityError({
-                    functionality: "Only PNG images are supported in assistant messages"
-                  });
-                }
-                if (part.data instanceof URL) {
-                  throw new UnsupportedFunctionalityError({
-                    functionality: "File data URLs in assistant messages are not supported"
-                  });
-                }
-                return {
-                  inlineData: {
-                    mimeType: part.mimeType,
-                    data: part.data
-                  }
-                };
-              }
-              case "tool-call": {
-                return {
-                  functionCall: {
-                    name: part.toolName,
-                    args: part.args
-                  }
-                };
-              }
-            }
-          }).filter((part) => part !== void 0)
-        });
-        break;
-      }
-      case "tool": {
-        systemMessagesAllowed = false;
-        contents.push({
-          role: "user",
-          parts: content.map((part) => ({
-            functionResponse: {
-              name: part.toolName,
-              response: {
-                name: part.toolName,
-                content: part.result
-              }
-            }
-          }))
-        });
-        break;
-      }
-    }
-  }
-  return {
-    systemInstruction: systemInstructionParts.length > 0 ? { parts: systemInstructionParts } : void 0,
-    contents
-  };
-}
-
-// src/get-model-path.ts
-function getModelPath(modelId) {
-  return modelId.includes("/") ? modelId : `models/${modelId}`;
-}
-var googleErrorDataSchema = objectType({
-  error: objectType({
-    code: numberType().nullable(),
-    message: stringType(),
-    status: stringType()
-  })
-});
-var googleFailedResponseHandler = createJsonErrorResponseHandler({
-  errorSchema: googleErrorDataSchema,
-  errorToMessage: (data) => data.error.message
-});
-function prepareTools(mode, useSearchGrounding, dynamicRetrievalConfig, modelId) {
-  var _a, _b;
-  const tools = ((_a = mode.tools) == null ? void 0 : _a.length) ? mode.tools : void 0;
-  const toolWarnings = [];
-  const isGemini2 = modelId.includes("gemini-2");
-  const supportsDynamicRetrieval = modelId.includes("gemini-1.5-flash") && !modelId.includes("-8b");
-  if (useSearchGrounding) {
-    return {
-      tools: isGemini2 ? { googleSearch: {} } : {
-        googleSearchRetrieval: !supportsDynamicRetrieval || !dynamicRetrievalConfig ? {} : { dynamicRetrievalConfig }
-      },
-      toolConfig: void 0,
-      toolWarnings
-    };
-  }
-  if (tools == null) {
-    return { tools: void 0, toolConfig: void 0, toolWarnings };
-  }
-  const functionDeclarations = [];
-  for (const tool of tools) {
-    if (tool.type === "provider-defined") {
-      toolWarnings.push({ type: "unsupported-tool", tool });
-    } else {
-      functionDeclarations.push({
-        name: tool.name,
-        description: (_b = tool.description) != null ? _b : "",
-        parameters: convertJSONSchemaToOpenAPISchema(tool.parameters)
-      });
-    }
-  }
-  const toolChoice = mode.toolChoice;
-  if (toolChoice == null) {
-    return {
-      tools: { functionDeclarations },
-      toolConfig: void 0,
-      toolWarnings
-    };
-  }
-  const type = toolChoice.type;
-  switch (type) {
-    case "auto":
-      return {
-        tools: { functionDeclarations },
-        toolConfig: { functionCallingConfig: { mode: "AUTO" } },
-        toolWarnings
-      };
-    case "none":
-      return {
-        tools: { functionDeclarations },
-        toolConfig: { functionCallingConfig: { mode: "NONE" } },
-        toolWarnings
-      };
-    case "required":
-      return {
-        tools: { functionDeclarations },
-        toolConfig: { functionCallingConfig: { mode: "ANY" } },
-        toolWarnings
-      };
-    case "tool":
-      return {
-        tools: { functionDeclarations },
-        toolConfig: {
-          functionCallingConfig: {
-            mode: "ANY",
-            allowedFunctionNames: [toolChoice.toolName]
-          }
-        },
-        toolWarnings
-      };
-    default: {
-      const _exhaustiveCheck = type;
-      throw new UnsupportedFunctionalityError({
-        functionality: `Unsupported tool choice type: ${_exhaustiveCheck}`
-      });
-    }
-  }
-}
-
-// src/map-google-generative-ai-finish-reason.ts
-function mapGoogleGenerativeAIFinishReason({
-  finishReason,
-  hasToolCalls
-}) {
-  switch (finishReason) {
-    case "STOP":
-      return hasToolCalls ? "tool-calls" : "stop";
-    case "MAX_TOKENS":
-      return "length";
-    case "IMAGE_SAFETY":
-    case "RECITATION":
-    case "SAFETY":
-    case "BLOCKLIST":
-    case "PROHIBITED_CONTENT":
-    case "SPII":
-      return "content-filter";
-    case "FINISH_REASON_UNSPECIFIED":
-    case "OTHER":
-      return "other";
-    case "MALFORMED_FUNCTION_CALL":
-      return "error";
-    default:
-      return "unknown";
-  }
-}
-
-// src/google-generative-ai-language-model.ts
-var GoogleGenerativeAILanguageModel = class {
-  constructor(modelId, settings, config) {
-    this.specificationVersion = "v1";
-    this.defaultObjectGenerationMode = "json";
-    this.supportsImageUrls = false;
-    this.modelId = modelId;
-    this.settings = settings;
-    this.config = config;
-  }
-  get supportsStructuredOutputs() {
-    var _a;
-    return (_a = this.settings.structuredOutputs) != null ? _a : true;
-  }
-  get provider() {
-    return this.config.provider;
-  }
-  async getArgs({
-    mode,
-    prompt,
-    maxTokens,
-    temperature,
-    topP,
-    topK,
-    frequencyPenalty,
-    presencePenalty,
-    stopSequences,
-    responseFormat,
-    seed,
-    providerMetadata
-  }) {
-    var _a, _b, _c;
-    const type = mode.type;
-    const warnings = [];
-    const googleOptions = parseProviderOptions({
-      provider: "google",
-      providerOptions: providerMetadata,
-      schema: googleGenerativeAIProviderOptionsSchema
-    });
-    if (((_a = googleOptions == null ? void 0 : googleOptions.thinkingConfig) == null ? void 0 : _a.includeThoughts) === true && !this.config.provider.startsWith("google.vertex.")) {
-      warnings.push({
-        type: "other",
-        message: `The 'includeThoughts' option is only supported with the Google Vertex provider and might not be supported or could behave unexpectedly with the current Google provider (${this.config.provider}).`
-      });
-    }
-    const generationConfig = {
-      // standardized settings:
-      maxOutputTokens: maxTokens,
-      temperature,
-      topK,
-      topP,
-      frequencyPenalty,
-      presencePenalty,
-      stopSequences,
-      seed,
-      // response format:
-      responseMimeType: (responseFormat == null ? void 0 : responseFormat.type) === "json" ? "application/json" : void 0,
-      responseSchema: (responseFormat == null ? void 0 : responseFormat.type) === "json" && responseFormat.schema != null && // Google GenAI does not support all OpenAPI Schema features,
-      // so this is needed as an escape hatch:
-      this.supportsStructuredOutputs ? convertJSONSchemaToOpenAPISchema(responseFormat.schema) : void 0,
-      ...this.settings.audioTimestamp && {
-        audioTimestamp: this.settings.audioTimestamp
-      },
-      // provider options:
-      responseModalities: googleOptions == null ? void 0 : googleOptions.responseModalities,
-      thinkingConfig: googleOptions == null ? void 0 : googleOptions.thinkingConfig
-    };
-    const { contents, systemInstruction } = convertToGoogleGenerativeAIMessages(prompt);
-    switch (type) {
-      case "regular": {
-        const { tools, toolConfig, toolWarnings } = prepareTools(
-          mode,
-          (_b = this.settings.useSearchGrounding) != null ? _b : false,
-          this.settings.dynamicRetrievalConfig,
-          this.modelId
-        );
-        return {
-          args: {
-            generationConfig,
-            contents,
-            systemInstruction,
-            safetySettings: this.settings.safetySettings,
-            tools,
-            toolConfig,
-            cachedContent: this.settings.cachedContent
-          },
-          warnings: [...warnings, ...toolWarnings]
-        };
-      }
-      case "object-json": {
-        return {
-          args: {
-            generationConfig: {
-              ...generationConfig,
-              responseMimeType: "application/json",
-              responseSchema: mode.schema != null && // Google GenAI does not support all OpenAPI Schema features,
-              // so this is needed as an escape hatch:
-              this.supportsStructuredOutputs ? convertJSONSchemaToOpenAPISchema(mode.schema) : void 0
-            },
-            contents,
-            systemInstruction,
-            safetySettings: this.settings.safetySettings,
-            cachedContent: this.settings.cachedContent
-          },
-          warnings
-        };
-      }
-      case "object-tool": {
-        return {
-          args: {
-            generationConfig,
-            contents,
-            tools: {
-              functionDeclarations: [
-                {
-                  name: mode.tool.name,
-                  description: (_c = mode.tool.description) != null ? _c : "",
-                  parameters: convertJSONSchemaToOpenAPISchema(
-                    mode.tool.parameters
-                  )
-                }
-              ]
-            },
-            toolConfig: { functionCallingConfig: { mode: "ANY" } },
-            safetySettings: this.settings.safetySettings,
-            cachedContent: this.settings.cachedContent
-          },
-          warnings
-        };
-      }
-      default: {
-        const _exhaustiveCheck = type;
-        throw new Error(`Unsupported type: ${_exhaustiveCheck}`);
-      }
-    }
-  }
-  supportsUrl(url) {
-    return this.config.isSupportedUrl(url);
-  }
-  async doGenerate(options) {
-    var _a, _b, _c, _d, _e;
-    const { args, warnings } = await this.getArgs(options);
-    const body = JSON.stringify(args);
-    const mergedHeaders = combineHeaders(
-      await resolve(this.config.headers),
-      options.headers
-    );
-    const {
-      responseHeaders,
-      value: response,
-      rawValue: rawResponse
-    } = await postJsonToApi({
-      url: `${this.config.baseURL}/${getModelPath(
-        this.modelId
-      )}:generateContent`,
-      headers: mergedHeaders,
-      body: args,
-      failedResponseHandler: googleFailedResponseHandler,
-      successfulResponseHandler: createJsonResponseHandler(responseSchema),
-      abortSignal: options.abortSignal,
-      fetch: this.config.fetch
-    });
-    const { contents: rawPrompt, ...rawSettings } = args;
-    const candidate = response.candidates[0];
-    const parts = candidate.content == null || typeof candidate.content !== "object" || !("parts" in candidate.content) ? [] : candidate.content.parts;
-    const toolCalls = getToolCallsFromParts({
-      parts,
-      // Use candidateParts
-      generateId: this.config.generateId
-    });
-    const usageMetadata = response.usageMetadata;
-    return {
-      text: getTextFromParts(parts),
-      reasoning: getReasoningDetailsFromParts(parts),
-      files: (_a = getInlineDataParts(parts)) == null ? void 0 : _a.map((part) => ({
-        data: part.inlineData.data,
-        mimeType: part.inlineData.mimeType
-      })),
-      toolCalls,
-      finishReason: mapGoogleGenerativeAIFinishReason({
-        finishReason: candidate.finishReason,
-        hasToolCalls: toolCalls != null && toolCalls.length > 0
-      }),
-      usage: {
-        promptTokens: (_b = usageMetadata == null ? void 0 : usageMetadata.promptTokenCount) != null ? _b : NaN,
-        completionTokens: (_c = usageMetadata == null ? void 0 : usageMetadata.candidatesTokenCount) != null ? _c : NaN
-      },
-      rawCall: { rawPrompt, rawSettings },
-      rawResponse: { headers: responseHeaders, body: rawResponse },
-      warnings,
-      providerMetadata: {
-        google: {
-          groundingMetadata: (_d = candidate.groundingMetadata) != null ? _d : null,
-          safetyRatings: (_e = candidate.safetyRatings) != null ? _e : null
-        }
-      },
-      sources: extractSources({
-        groundingMetadata: candidate.groundingMetadata,
-        generateId: this.config.generateId
-      }),
-      request: { body }
-    };
-  }
-  async doStream(options) {
-    const { args, warnings } = await this.getArgs(options);
-    const body = JSON.stringify(args);
-    const headers = combineHeaders(
-      await resolve(this.config.headers),
-      options.headers
-    );
-    const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/${getModelPath(
-        this.modelId
-      )}:streamGenerateContent?alt=sse`,
-      headers,
-      body: args,
-      failedResponseHandler: googleFailedResponseHandler,
-      successfulResponseHandler: createEventSourceResponseHandler(chunkSchema),
-      abortSignal: options.abortSignal,
-      fetch: this.config.fetch
-    });
-    const { contents: rawPrompt, ...rawSettings } = args;
-    let finishReason = "unknown";
-    let usage = {
-      promptTokens: Number.NaN,
-      completionTokens: Number.NaN
-    };
-    let providerMetadata = void 0;
-    const generateId2 = this.config.generateId;
-    let hasToolCalls = false;
-    return {
-      stream: response.pipeThrough(
-        new TransformStream({
-          transform(chunk, controller) {
-            var _a, _b, _c, _d, _e, _f;
-            if (!chunk.success) {
-              controller.enqueue({ type: "error", error: chunk.error });
-              return;
-            }
-            const value = chunk.value;
-            const usageMetadata = value.usageMetadata;
-            if (usageMetadata != null) {
-              usage = {
-                promptTokens: (_a = usageMetadata.promptTokenCount) != null ? _a : NaN,
-                completionTokens: (_b = usageMetadata.candidatesTokenCount) != null ? _b : NaN
-              };
-            }
-            const candidate = (_c = value.candidates) == null ? void 0 : _c[0];
-            if (candidate == null) {
-              return;
-            }
-            const content = candidate.content;
-            if (content != null) {
-              const deltaText = getTextFromParts(content.parts);
-              if (deltaText != null) {
-                controller.enqueue({
-                  type: "text-delta",
-                  textDelta: deltaText
-                });
-              }
-              const reasoningDeltaText = getReasoningDetailsFromParts(
-                content.parts
-              );
-              if (reasoningDeltaText != null) {
-                for (const part of reasoningDeltaText) {
-                  controller.enqueue({
-                    type: "reasoning",
-                    textDelta: part.text
-                  });
-                }
-              }
-              const inlineDataParts = getInlineDataParts(content.parts);
-              if (inlineDataParts != null) {
-                for (const part of inlineDataParts) {
-                  controller.enqueue({
-                    type: "file",
-                    mimeType: part.inlineData.mimeType,
-                    data: part.inlineData.data
-                  });
-                }
-              }
-              const toolCallDeltas = getToolCallsFromParts({
-                parts: content.parts,
-                generateId: generateId2
-              });
-              if (toolCallDeltas != null) {
-                for (const toolCall of toolCallDeltas) {
-                  controller.enqueue({
-                    type: "tool-call-delta",
-                    toolCallType: "function",
-                    toolCallId: toolCall.toolCallId,
-                    toolName: toolCall.toolName,
-                    argsTextDelta: toolCall.args
-                  });
-                  controller.enqueue({
-                    type: "tool-call",
-                    toolCallType: "function",
-                    toolCallId: toolCall.toolCallId,
-                    toolName: toolCall.toolName,
-                    args: toolCall.args
-                  });
-                  hasToolCalls = true;
-                }
-              }
-            }
-            if (candidate.finishReason != null) {
-              finishReason = mapGoogleGenerativeAIFinishReason({
-                finishReason: candidate.finishReason,
-                hasToolCalls
-              });
-              const sources = (_d = extractSources({
-                groundingMetadata: candidate.groundingMetadata,
-                generateId: generateId2
-              })) != null ? _d : [];
-              for (const source of sources) {
-                controller.enqueue({ type: "source", source });
-              }
-              providerMetadata = {
-                google: {
-                  groundingMetadata: (_e = candidate.groundingMetadata) != null ? _e : null,
-                  safetyRatings: (_f = candidate.safetyRatings) != null ? _f : null
-                }
-              };
-            }
-          },
-          flush(controller) {
-            controller.enqueue({
-              type: "finish",
-              finishReason,
-              usage,
-              providerMetadata
-            });
-          }
-        })
-      ),
-      rawCall: { rawPrompt, rawSettings },
-      rawResponse: { headers: responseHeaders },
-      warnings,
-      request: { body }
-    };
-  }
-};
-function getToolCallsFromParts({
-  parts,
-  generateId: generateId2
-}) {
-  const functionCallParts = parts == null ? void 0 : parts.filter(
-    (part) => "functionCall" in part
-  );
-  return functionCallParts == null || functionCallParts.length === 0 ? void 0 : functionCallParts.map((part) => ({
-    toolCallType: "function",
-    toolCallId: generateId2(),
-    toolName: part.functionCall.name,
-    args: JSON.stringify(part.functionCall.args)
-  }));
-}
-function getTextFromParts(parts) {
-  const textParts = parts == null ? void 0 : parts.filter(
-    (part) => "text" in part && part.thought !== true
-  );
-  return textParts == null || textParts.length === 0 ? void 0 : textParts.map((part) => part.text).join("");
-}
-function getReasoningDetailsFromParts(parts) {
-  const reasoningParts = parts == null ? void 0 : parts.filter(
-    (part) => "text" in part && part.thought === true
-  );
-  return reasoningParts == null || reasoningParts.length === 0 ? void 0 : reasoningParts.map((part) => ({ type: "text", text: part.text }));
-}
-function getInlineDataParts(parts) {
-  return parts == null ? void 0 : parts.filter(
-    (part) => "inlineData" in part
-  );
-}
-function extractSources({
-  groundingMetadata,
-  generateId: generateId2
-}) {
-  var _a;
-  return (_a = groundingMetadata == null ? void 0 : groundingMetadata.groundingChunks) == null ? void 0 : _a.filter(
-    (chunk) => chunk.web != null
-  ).map((chunk) => ({
-    sourceType: "url",
-    id: generateId2(),
-    url: chunk.web.uri,
-    title: chunk.web.title
-  }));
-}
-var contentSchema = objectType({
-  role: stringType(),
-  parts: arrayType(
-    unionType([
-      objectType({
-        text: stringType(),
-        thought: booleanType().nullish()
-      }),
-      objectType({
-        functionCall: objectType({
-          name: stringType(),
-          args: unknownType()
-        })
-      }),
-      objectType({
-        inlineData: objectType({
-          mimeType: stringType(),
-          data: stringType()
-        })
-      })
-    ])
-  ).nullish()
-});
-var groundingChunkSchema = objectType({
-  web: objectType({ uri: stringType(), title: stringType() }).nullish(),
-  retrievedContext: objectType({ uri: stringType(), title: stringType() }).nullish()
-});
-var groundingMetadataSchema = objectType({
-  webSearchQueries: arrayType(stringType()).nullish(),
-  retrievalQueries: arrayType(stringType()).nullish(),
-  searchEntryPoint: objectType({ renderedContent: stringType() }).nullish(),
-  groundingChunks: arrayType(groundingChunkSchema).nullish(),
-  groundingSupports: arrayType(
-    objectType({
-      segment: objectType({
-        startIndex: numberType().nullish(),
-        endIndex: numberType().nullish(),
-        text: stringType().nullish()
-      }),
-      segment_text: stringType().nullish(),
-      groundingChunkIndices: arrayType(numberType()).nullish(),
-      supportChunkIndices: arrayType(numberType()).nullish(),
-      confidenceScores: arrayType(numberType()).nullish(),
-      confidenceScore: arrayType(numberType()).nullish()
-    })
-  ).nullish(),
-  retrievalMetadata: unionType([
-    objectType({
-      webDynamicRetrievalScore: numberType()
-    }),
-    objectType({})
-  ]).nullish()
-});
-var safetyRatingSchema = objectType({
-  category: stringType().nullish(),
-  probability: stringType().nullish(),
-  probabilityScore: numberType().nullish(),
-  severity: stringType().nullish(),
-  severityScore: numberType().nullish(),
-  blocked: booleanType().nullish()
-});
-var responseSchema = objectType({
-  candidates: arrayType(
-    objectType({
-      content: contentSchema.nullish().or(objectType({}).strict()),
-      finishReason: stringType().nullish(),
-      safetyRatings: arrayType(safetyRatingSchema).nullish(),
-      groundingMetadata: groundingMetadataSchema.nullish()
-    })
-  ),
-  usageMetadata: objectType({
-    promptTokenCount: numberType().nullish(),
-    candidatesTokenCount: numberType().nullish(),
-    totalTokenCount: numberType().nullish()
-  }).nullish()
-});
-var chunkSchema = objectType({
-  candidates: arrayType(
-    objectType({
-      content: contentSchema.nullish(),
-      finishReason: stringType().nullish(),
-      safetyRatings: arrayType(safetyRatingSchema).nullish(),
-      groundingMetadata: groundingMetadataSchema.nullish()
-    })
-  ).nullish(),
-  usageMetadata: objectType({
-    promptTokenCount: numberType().nullish(),
-    candidatesTokenCount: numberType().nullish(),
-    totalTokenCount: numberType().nullish()
-  }).nullish()
-});
-var googleGenerativeAIProviderOptionsSchema = objectType({
-  responseModalities: arrayType(enumType(["TEXT", "IMAGE"])).nullish(),
-  thinkingConfig: objectType({
-    thinkingBudget: numberType().nullish(),
-    includeThoughts: booleanType().nullish()
-  }).nullish()
-});
-var GoogleGenerativeAIEmbeddingModel = class {
-  constructor(modelId, settings, config) {
-    this.specificationVersion = "v1";
-    this.modelId = modelId;
-    this.settings = settings;
-    this.config = config;
-  }
-  get provider() {
-    return this.config.provider;
-  }
-  get maxEmbeddingsPerCall() {
-    return 2048;
-  }
-  get supportsParallelCalls() {
-    return true;
-  }
-  async doEmbed({
-    values,
-    headers,
-    abortSignal
-  }) {
-    if (values.length > this.maxEmbeddingsPerCall) {
-      throw new TooManyEmbeddingValuesForCallError({
-        provider: this.provider,
-        modelId: this.modelId,
-        maxEmbeddingsPerCall: this.maxEmbeddingsPerCall,
-        values
-      });
-    }
-    const mergedHeaders = combineHeaders(
-      await resolve(this.config.headers),
-      headers
-    );
-    const { responseHeaders, value: response } = await postJsonToApi({
-      url: `${this.config.baseURL}/models/${this.modelId}:batchEmbedContents`,
-      headers: mergedHeaders,
-      body: {
-        requests: values.map((value) => ({
-          model: `models/${this.modelId}`,
-          content: { role: "user", parts: [{ text: value }] },
-          outputDimensionality: this.settings.outputDimensionality,
-          taskType: this.settings.taskType
-        }))
-      },
-      failedResponseHandler: googleFailedResponseHandler,
-      successfulResponseHandler: createJsonResponseHandler(
-        googleGenerativeAITextEmbeddingResponseSchema
-      ),
-      abortSignal,
-      fetch: this.config.fetch
-    });
-    return {
-      embeddings: response.embeddings.map((item) => item.values),
-      usage: void 0,
-      rawResponse: { headers: responseHeaders }
-    };
-  }
-};
-var googleGenerativeAITextEmbeddingResponseSchema = objectType({
-  embeddings: arrayType(objectType({ values: arrayType(numberType()) }))
-});
-
-// src/google-supported-file-url.ts
-function isSupportedFileUrl(url) {
-  return url.toString().startsWith("https://generativelanguage.googleapis.com/v1beta/files/");
-}
-
-// src/google-provider.ts
-function createGoogleGenerativeAI(options = {}) {
-  var _a;
-  const baseURL = (_a = withoutTrailingSlash(options.baseURL)) != null ? _a : "https://generativelanguage.googleapis.com/v1beta";
-  const getHeaders = () => ({
-    "x-goog-api-key": loadApiKey({
-      apiKey: options.apiKey,
-      environmentVariableName: "GOOGLE_GENERATIVE_AI_API_KEY",
-      description: "Google Generative AI"
-    }),
-    ...options.headers
-  });
-  const createChatModel = (modelId, settings = {}) => {
-    var _a2;
-    return new GoogleGenerativeAILanguageModel(modelId, settings, {
-      provider: "google.generative-ai",
-      baseURL,
-      headers: getHeaders,
-      generateId: (_a2 = options.generateId) != null ? _a2 : generateId,
-      isSupportedUrl: isSupportedFileUrl,
-      fetch: options.fetch
-    });
-  };
-  const createEmbeddingModel = (modelId, settings = {}) => new GoogleGenerativeAIEmbeddingModel(modelId, settings, {
-    provider: "google.generative-ai",
-    baseURL,
-    headers: getHeaders,
-    fetch: options.fetch
-  });
-  const provider = function(modelId, settings) {
-    if (new.target) {
-      throw new Error(
-        "The Google Generative AI model function cannot be called with the new keyword."
-      );
-    }
-    return createChatModel(modelId, settings);
-  };
-  provider.languageModel = createChatModel;
-  provider.chat = createChatModel;
-  provider.generativeAI = createChatModel;
-  provider.embedding = createEmbeddingModel;
-  provider.textEmbedding = createEmbeddingModel;
-  provider.textEmbeddingModel = createEmbeddingModel;
-  return provider;
-}
-var google = createGoogleGenerativeAI();
-
-// src/base.ts
-var MastraBase = class {
-  component = RegisteredLogger.LLM;
-  logger;
-  name;
-  telemetry;
-  constructor({ component, name }) {
-    this.component = component || RegisteredLogger.LLM;
-    this.name = name;
-    this.logger = new ConsoleLogger({ name: `${this.component} - ${this.name}` });
-  }
-  /**
-   * Set the logger for the agent
-   * @param logger
-   */
-  __setLogger(logger) {
-    this.logger = logger;
-    if (this.component !== RegisteredLogger.LLM) {
-      this.logger.debug(`Logger updated [component=${this.component}] [name=${this.name}]`);
-    }
-  }
-  /**
-   * Set the telemetry for the
-   * @param telemetry
-   */
-  __setTelemetry(telemetry) {
-    this.telemetry = telemetry;
-    if (this.component !== RegisteredLogger.LLM) {
-      this.logger.debug(`Telemetry updated [component=${this.component}] [name=${this.telemetry.name}]`);
-    }
-  }
-  /**
-   * Get the telemetry on the vector
-   * @returns telemetry
-   */
-  __getTelemetry() {
-    return this.telemetry;
-  }
-  /* 
-    get experimental_telemetry config
-    */
-  get experimental_telemetry() {
-    return this.telemetry ? {
-      // tracer: this.telemetry.tracer,
-      tracer: this.telemetry.getBaggageTracer(),
-      isEnabled: !!this.telemetry.tracer
-    } : void 0;
-  }
-};
-
-// src/hooks/mitt.ts
-function mitt(all) {
-  all = all || /* @__PURE__ */ new Map();
-  return {
-    /**
-     * A Map of event names to registered handler functions.
-     */
-    all,
-    /**
-     * Register an event handler for the given type.
-     * @param {string|symbol} type Type of event to listen for, or `'*'` for all events
-     * @param {Function} handler Function to call in response to given event
-     * @memberOf mitt
-     */
-    on(type, handler) {
-      const handlers = all.get(type);
-      if (handlers) {
-        handlers.push(handler);
-      } else {
-        all.set(type, [handler]);
-      }
-    },
-    /**
-     * Remove an event handler for the given type.
-     * If `handler` is omitted, all handlers of the given type are removed.
-     * @param {string|symbol} type Type of event to unregister `handler` from (`'*'` to remove a wildcard handler)
-     * @param {Function} [handler] Handler function to remove
-     * @memberOf mitt
-     */
-    off(type, handler) {
-      const handlers = all.get(type);
-      if (handlers) {
-        if (handler) {
-          handlers.splice(handlers.indexOf(handler) >>> 0, 1);
-        } else {
-          all.set(type, []);
-        }
-      }
-    },
-    /**
-     * Invoke all handlers for the given type.
-     * If present, `'*'` handlers are invoked after type-matched handlers.
-     *
-     * Note: Manually firing '*' handlers is not supported.
-     *
-     * @param {string|symbol} type The event type to invoke
-     * @param {Any} [evt] Any value (object is recommended and powerful), passed to each handler
-     * @memberOf mitt
-     */
-    emit(type, evt) {
-      let handlers = all.get(type);
-      if (handlers) {
-        handlers.slice().map((handler) => {
-          handler(evt);
-        });
-      }
-      handlers = all.get("*");
-      if (handlers) {
-        handlers.slice().map((handler) => {
-          handler(type, evt);
-        });
-      }
-    }
-  };
-}
-
-// src/hooks/index.ts
-var AvailableHooks = /* @__PURE__ */ ((AvailableHooks2) => {
-  AvailableHooks2["ON_EVALUATION"] = "onEvaluation";
-  AvailableHooks2["ON_GENERATION"] = "onGeneration";
-  return AvailableHooks2;
-})(AvailableHooks || {});
-var hooks = mitt();
-function registerHook(hook, action) {
-  hooks.on(hook, action);
-}
-function executeHook(hook, data) {
-  setImmediate(() => {
-    hooks.emit(hook, data);
-  });
-}
-
-// src/runtime-context/index.ts
-var RuntimeContext = class {
-  registry = /* @__PURE__ */ new Map();
-  constructor(iterable) {
-    this.registry = new Map(iterable);
-  }
-  /**
-   * set a value with strict typing if `Values` is a Record and the key exists in it.
-   */
-  set(key, value) {
-    this.registry.set(key, value);
-  }
-  /**
-   * Get a value with its type
-   */
-  get(key) {
-    return this.registry.get(key);
-  }
-  /**
-   * Check if a key exists in the container
-   */
-  has(key) {
-    return this.registry.has(key);
-  }
-  /**
-   * Delete a value by key
-   */
-  delete(key) {
-    return this.registry.delete(key);
-  }
-  /**
-   * Clear all values from the container
-   */
-  clear() {
-    this.registry.clear();
-  }
-  /**
-   * Get all keys in the container
-   */
-  keys() {
-    return this.registry.keys();
-  }
-  /**
-   * Get all values in the container
-   */
-  values() {
-    return this.registry.values();
-  }
-  /**
-   * Get all entries in the container
-   */
-  entries() {
-    return this.registry.entries();
-  }
-  /**
-   * Get the size of the container
-   */
-  size() {
-    return this.registry.size;
-  }
-  /**
-   * Execute a function for each entry in the container
-   */
-  forEach(callbackfn) {
-    this.registry.forEach(callbackfn);
-  }
-};
 
 var z$1 = /*#__PURE__*/Object.freeze({
 	__proto__: null,
@@ -21311,92 +20368,6 @@ var TABLE_SCHEMAS = {
   }
 };
 
-// src/storage/base.ts
-var MastraStorage = class extends MastraBase {
-  /** @deprecated import from { TABLE_WORKFLOW_SNAPSHOT } '@mastra/core/storage' instead */
-  static TABLE_WORKFLOW_SNAPSHOT = TABLE_WORKFLOW_SNAPSHOT;
-  /** @deprecated import from { TABLE_EVALS } '@mastra/core/storage' instead */
-  static TABLE_EVALS = TABLE_EVALS;
-  /** @deprecated import from { TABLE_MESSAGES } '@mastra/core/storage' instead */
-  static TABLE_MESSAGES = TABLE_MESSAGES;
-  /** @deprecated import from { TABLE_THREADS } '@mastra/core/storage' instead */
-  static TABLE_THREADS = TABLE_THREADS;
-  /** @deprecated import { TABLE_TRACES } from '@mastra/core/storage' instead */
-  static TABLE_TRACES = TABLE_TRACES;
-  hasInitialized = null;
-  shouldCacheInit = true;
-  constructor({ name }) {
-    super({
-      component: "STORAGE",
-      name
-    });
-  }
-  batchTraceInsert({ records }) {
-    return this.batchInsert({ tableName: TABLE_TRACES, records });
-  }
-  async init() {
-    if (this.shouldCacheInit && await this.hasInitialized) {
-      return;
-    }
-    this.hasInitialized = Promise.all([
-      this.createTable({
-        tableName: TABLE_WORKFLOW_SNAPSHOT,
-        schema: TABLE_SCHEMAS[TABLE_WORKFLOW_SNAPSHOT]
-      }),
-      this.createTable({
-        tableName: TABLE_EVALS,
-        schema: TABLE_SCHEMAS[TABLE_EVALS]
-      }),
-      this.createTable({
-        tableName: TABLE_THREADS,
-        schema: TABLE_SCHEMAS[TABLE_THREADS]
-      }),
-      this.createTable({
-        tableName: TABLE_MESSAGES,
-        schema: TABLE_SCHEMAS[TABLE_MESSAGES]
-      }),
-      this.createTable({
-        tableName: TABLE_TRACES,
-        schema: TABLE_SCHEMAS[TABLE_TRACES]
-      })
-    ]).then(() => true);
-    await this.hasInitialized;
-  }
-  async persistWorkflowSnapshot({
-    workflowName,
-    runId,
-    snapshot
-  }) {
-    await this.init();
-    const data = {
-      workflow_name: workflowName,
-      run_id: runId,
-      snapshot,
-      createdAt: /* @__PURE__ */ new Date(),
-      updatedAt: /* @__PURE__ */ new Date()
-    };
-    this.logger.debug("Persisting workflow snapshot", { workflowName, runId, data });
-    await this.insert({
-      tableName: TABLE_WORKFLOW_SNAPSHOT,
-      record: data
-    });
-  }
-  async loadWorkflowSnapshot({
-    workflowName,
-    runId
-  }) {
-    if (!this.hasInitialized) {
-      await this.init();
-    }
-    this.logger.debug("Loading workflow snapshot", { workflowName, runId });
-    const d = await this.load({
-      tableName: TABLE_WORKFLOW_SNAPSHOT,
-      keys: { workflow_name: workflowName, run_id: runId }
-    });
-    return d ? d.snapshot : null;
-  }
-};
-
 // src/vector/vector.ts
 var MastraVector = class extends MastraBase {
   constructor() {
@@ -21623,6 +20594,2179 @@ var BaseFilterTranslator = class _BaseFilterTranslator {
       }
     }
     return { supported: isSupported, messages };
+  }
+};
+
+// src/storage/base.ts
+var MastraStorage = class extends MastraBase {
+  /** @deprecated import from { TABLE_WORKFLOW_SNAPSHOT } '@mastra/core/storage' instead */
+  static TABLE_WORKFLOW_SNAPSHOT = TABLE_WORKFLOW_SNAPSHOT;
+  /** @deprecated import from { TABLE_EVALS } '@mastra/core/storage' instead */
+  static TABLE_EVALS = TABLE_EVALS;
+  /** @deprecated import from { TABLE_MESSAGES } '@mastra/core/storage' instead */
+  static TABLE_MESSAGES = TABLE_MESSAGES;
+  /** @deprecated import from { TABLE_THREADS } '@mastra/core/storage' instead */
+  static TABLE_THREADS = TABLE_THREADS;
+  /** @deprecated import { TABLE_TRACES } from '@mastra/core/storage' instead */
+  static TABLE_TRACES = TABLE_TRACES;
+  hasInitialized = null;
+  shouldCacheInit = true;
+  constructor({ name }) {
+    super({
+      component: "STORAGE",
+      name
+    });
+  }
+  batchTraceInsert({ records }) {
+    return this.batchInsert({ tableName: TABLE_TRACES, records });
+  }
+  async init() {
+    if (this.shouldCacheInit && await this.hasInitialized) {
+      return;
+    }
+    this.hasInitialized = Promise.all([
+      this.createTable({
+        tableName: TABLE_WORKFLOW_SNAPSHOT,
+        schema: TABLE_SCHEMAS[TABLE_WORKFLOW_SNAPSHOT]
+      }),
+      this.createTable({
+        tableName: TABLE_EVALS,
+        schema: TABLE_SCHEMAS[TABLE_EVALS]
+      }),
+      this.createTable({
+        tableName: TABLE_THREADS,
+        schema: TABLE_SCHEMAS[TABLE_THREADS]
+      }),
+      this.createTable({
+        tableName: TABLE_MESSAGES,
+        schema: TABLE_SCHEMAS[TABLE_MESSAGES]
+      }),
+      this.createTable({
+        tableName: TABLE_TRACES,
+        schema: TABLE_SCHEMAS[TABLE_TRACES]
+      })
+    ]).then(() => true);
+    await this.hasInitialized;
+  }
+  async persistWorkflowSnapshot({
+    workflowName,
+    runId,
+    snapshot
+  }) {
+    await this.init();
+    const data = {
+      workflow_name: workflowName,
+      run_id: runId,
+      snapshot,
+      createdAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date()
+    };
+    this.logger.debug("Persisting workflow snapshot", { workflowName, runId, data });
+    await this.insert({
+      tableName: TABLE_WORKFLOW_SNAPSHOT,
+      record: data
+    });
+  }
+  async loadWorkflowSnapshot({
+    workflowName,
+    runId
+  }) {
+    if (!this.hasInitialized) {
+      await this.init();
+    }
+    this.logger.debug("Loading workflow snapshot", { workflowName, runId });
+    const d = await this.load({
+      tableName: TABLE_WORKFLOW_SNAPSHOT,
+      keys: { workflow_name: workflowName, run_id: runId }
+    });
+    return d ? d.snapshot : null;
+  }
+};
+
+// src/vector/index.ts
+var LibSQLFilterTranslator = class extends BaseFilterTranslator {
+  getSupportedOperators() {
+    return {
+      ...BaseFilterTranslator.DEFAULT_OPERATORS,
+      regex: [],
+      custom: ["$contains", "$size"]
+    };
+  }
+  translate(filter) {
+    if (this.isEmpty(filter)) {
+      return filter;
+    }
+    this.validateFilter(filter);
+    return this.translateNode(filter);
+  }
+  translateNode(node, currentPath = "") {
+    if (this.isRegex(node)) {
+      throw new Error("Direct regex pattern format is not supported in LibSQL");
+    }
+    const withPath = (result2) => currentPath ? { [currentPath]: result2 } : result2;
+    if (this.isPrimitive(node)) {
+      return withPath({ $eq: this.normalizeComparisonValue(node) });
+    }
+    if (Array.isArray(node)) {
+      return withPath({ $in: this.normalizeArrayValues(node) });
+    }
+    const entries = Object.entries(node);
+    const result = {};
+    for (const [key, value] of entries) {
+      const newPath = currentPath ? `${currentPath}.${key}` : key;
+      if (this.isLogicalOperator(key)) {
+        result[key] = Array.isArray(value) ? value.map((filter) => this.translateNode(filter)) : this.translateNode(value);
+      } else if (this.isOperator(key)) {
+        if (this.isArrayOperator(key) && !Array.isArray(value) && key !== "$elemMatch") {
+          result[key] = [value];
+        } else if (this.isBasicOperator(key) && Array.isArray(value)) {
+          result[key] = JSON.stringify(value);
+        } else {
+          result[key] = value;
+        }
+      } else if (typeof value === "object" && value !== null) {
+        const hasOperators = Object.keys(value).some((k) => this.isOperator(k));
+        if (hasOperators) {
+          result[newPath] = this.translateNode(value);
+        } else {
+          Object.assign(result, this.translateNode(value, newPath));
+        }
+      } else {
+        result[newPath] = this.translateNode(value);
+      }
+    }
+    return result;
+  }
+  // TODO: Look more into regex support for LibSQL
+  // private translateRegexPattern(pattern: string, options: string = ''): any {
+  //   if (!options) return { $regex: pattern };
+  //   const flags = options
+  //     .split('')
+  //     .filter(f => 'imsux'.includes(f))
+  //     .join('');
+  //   return {
+  //     $regex: pattern,
+  //     $options: flags,
+  //   };
+  // }
+};
+var createBasicOperator = (symbol) => {
+  return (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    return {
+      sql: `CASE 
+        WHEN ? IS NULL THEN json_extract(metadata, '$."${jsonPathKey}"') IS ${symbol === "=" ? "" : "NOT"} NULL
+        ELSE json_extract(metadata, '$."${jsonPathKey}"') ${symbol} ?
+      END`,
+      needsValue: true,
+      transformValue: () => {
+        return [value, value];
+      }
+    };
+  };
+};
+var createNumericOperator = (symbol) => {
+  return (key) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    return {
+      sql: `CAST(json_extract(metadata, '$."${jsonPathKey}"') AS NUMERIC) ${symbol} ?`,
+      needsValue: true
+    };
+  };
+};
+var validateJsonArray = (key) => `json_valid(json_extract(metadata, '$."${key}"'))
+   AND json_type(json_extract(metadata, '$."${key}"')) = 'array'`;
+var pattern = /json_extract\(metadata, '\$\."[^"]*"(\."[^"]*")*'\)/g;
+function buildElemMatchConditions(value) {
+  const conditions = Object.entries(value).map(([field, fieldValue]) => {
+    if (field.startsWith("$")) {
+      const { sql, values } = buildCondition("elem.value", { [field]: fieldValue });
+      const elemSql = sql.replace(pattern, "elem.value");
+      return { sql: elemSql, values };
+    } else if (typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
+      const { sql, values } = buildCondition(field, fieldValue);
+      const elemSql = sql.replace(pattern, `json_extract(elem.value, '$."${field}"')`);
+      return { sql: elemSql, values };
+    } else {
+      const parsedFieldKey = parseFieldKey(field);
+      return {
+        sql: `json_extract(elem.value, '$."${parsedFieldKey}"') = ?`,
+        values: [fieldValue]
+      };
+    }
+  });
+  return conditions;
+}
+var FILTER_OPERATORS = {
+  $eq: createBasicOperator("="),
+  $ne: createBasicOperator("!="),
+  $gt: createNumericOperator(">"),
+  $gte: createNumericOperator(">="),
+  $lt: createNumericOperator("<"),
+  $lte: createNumericOperator("<="),
+  // Array Operators
+  $in: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    const arr = Array.isArray(value) ? value : [value];
+    if (arr.length === 0) {
+      return { sql: "1 = 0", needsValue: true, transformValue: () => [] };
+    }
+    const paramPlaceholders = arr.map(() => "?").join(",");
+    return {
+      sql: `(
+      CASE
+        WHEN ${validateJsonArray(jsonPathKey)} THEN
+          EXISTS (
+            SELECT 1 FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
+            WHERE elem.value IN (SELECT value FROM json_each(?))
+          )
+        ELSE json_extract(metadata, '$."${jsonPathKey}"') IN (${paramPlaceholders})
+      END
+    )`,
+      needsValue: true,
+      transformValue: () => [JSON.stringify(arr), ...arr]
+    };
+  },
+  $nin: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    const arr = Array.isArray(value) ? value : [value];
+    if (arr.length === 0) {
+      return { sql: "1 = 1", needsValue: true, transformValue: () => [] };
+    }
+    const paramPlaceholders = arr.map(() => "?").join(",");
+    return {
+      sql: `(
+      CASE
+        WHEN ${validateJsonArray(jsonPathKey)} THEN
+          NOT EXISTS (
+            SELECT 1 FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
+            WHERE elem.value IN (SELECT value FROM json_each(?))
+          )
+        ELSE json_extract(metadata, '$."${jsonPathKey}"') NOT IN (${paramPlaceholders})
+      END
+    )`,
+      needsValue: true,
+      transformValue: () => [JSON.stringify(arr), ...arr]
+    };
+  },
+  $all: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    let sql;
+    const arrayValue = Array.isArray(value) ? value : [value];
+    if (arrayValue.length === 0) {
+      sql = "1 = 0";
+    } else {
+      sql = `(
+      CASE
+        WHEN ${validateJsonArray(jsonPathKey)} THEN
+          NOT EXISTS (
+            SELECT value
+            FROM json_each(?)
+            WHERE value NOT IN (
+              SELECT value
+              FROM json_each(json_extract(metadata, '$."${jsonPathKey}"'))
+            )
+          )
+        ELSE FALSE
+      END
+    )`;
+    }
+    return {
+      sql,
+      needsValue: true,
+      transformValue: () => {
+        if (arrayValue.length === 0) {
+          return [];
+        }
+        return [JSON.stringify(arrayValue)];
+      }
+    };
+  },
+  $elemMatch: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    if (typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("$elemMatch requires an object with conditions");
+    }
+    const conditions = buildElemMatchConditions(value);
+    return {
+      sql: `(
+        CASE
+          WHEN ${validateJsonArray(jsonPathKey)} THEN
+            EXISTS (
+              SELECT 1
+              FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
+              WHERE ${conditions.map((c) => c.sql).join(" AND ")}
+            )
+          ELSE FALSE
+        END
+      )`,
+      needsValue: true,
+      transformValue: () => conditions.flatMap((c) => c.values)
+    };
+  },
+  // Element Operators
+  $exists: (key) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    return {
+      sql: `json_extract(metadata, '$."${jsonPathKey}"') IS NOT NULL`,
+      needsValue: false
+    };
+  },
+  // Logical Operators
+  $and: (key) => ({
+    sql: `(${key})`,
+    needsValue: false
+  }),
+  $or: (key) => ({
+    sql: `(${key})`,
+    needsValue: false
+  }),
+  $not: (key) => ({ sql: `NOT (${key})`, needsValue: false }),
+  $nor: (key) => ({
+    sql: `NOT (${key})`,
+    needsValue: false
+  }),
+  $size: (key, paramIndex) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    return {
+      sql: `(
+    CASE
+      WHEN json_type(json_extract(metadata, '$."${jsonPathKey}"')) = 'array' THEN 
+        json_array_length(json_extract(metadata, '$."${jsonPathKey}"')) = $${paramIndex}
+      ELSE FALSE
+    END
+  )`,
+      needsValue: true
+    };
+  },
+  //   /**
+  //    * Regex Operators
+  //    * Supports case insensitive and multiline
+  //    */
+  //   $regex: (key: string): FilterOperator => ({
+  //     sql: `json_extract(metadata, '$."${toJsonPathKey(key)}"') = ?`,
+  //     needsValue: true,
+  //     transformValue: (value: any) => {
+  //       const pattern = typeof value === 'object' ? value.$regex : value;
+  //       const options = typeof value === 'object' ? value.$options || '' : '';
+  //       let sql = `json_extract(metadata, '$."${toJsonPathKey(key)}"')`;
+  //       // Handle multiline
+  //       //   if (options.includes('m')) {
+  //       //     sql = `REPLACE(${sql}, CHAR(10), '\n')`;
+  //       //   }
+  //       //       let finalPattern = pattern;
+  //       // if (options) {
+  //       //   finalPattern = `(\\?${options})${pattern}`;
+  //       // }
+  //       //   // Handle case insensitivity
+  //       //   if (options.includes('i')) {
+  //       //     sql = `LOWER(${sql}) REGEXP LOWER(?)`;
+  //       //   } else {
+  //       //     sql = `${sql} REGEXP ?`;
+  //       //   }
+  //       if (options.includes('m')) {
+  //         sql = `EXISTS (
+  //         SELECT 1
+  //         FROM json_each(
+  //           json_array(
+  //             ${sql},
+  //             REPLACE(${sql}, CHAR(10), CHAR(13))
+  //           )
+  //         ) as lines
+  //         WHERE lines.value REGEXP ?
+  //       )`;
+  //       } else {
+  //         sql = `${sql} REGEXP ?`;
+  //       }
+  //       // Handle case insensitivity
+  //       if (options.includes('i')) {
+  //         sql = sql.replace('REGEXP ?', 'REGEXP LOWER(?)');
+  //         sql = sql.replace('value REGEXP', 'LOWER(value) REGEXP');
+  //       }
+  //       // Handle extended - allows whitespace and comments in pattern
+  //       if (options.includes('x')) {
+  //         // Remove whitespace and comments from pattern
+  //         const cleanPattern = pattern.replace(/\s+|#.*$/gm, '');
+  //         return {
+  //           sql,
+  //           values: [cleanPattern],
+  //         };
+  //       }
+  //       return {
+  //         sql,
+  //         values: [pattern],
+  //       };
+  //     },
+  //   }),
+  $contains: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    let sql;
+    if (Array.isArray(value)) {
+      sql = `(
+        SELECT ${validateJsonArray(jsonPathKey)}
+        AND EXISTS (
+          SELECT 1
+          FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as m
+          WHERE m.value IN (SELECT value FROM json_each(?))
+        )
+      )`;
+    } else if (typeof value === "string") {
+      sql = `lower(json_extract(metadata, '$."${jsonPathKey}"')) LIKE '%' || lower(?) || '%' ESCAPE '\\'`;
+    } else {
+      sql = `json_extract(metadata, '$."${jsonPathKey}"') = ?`;
+    }
+    return {
+      sql,
+      needsValue: true,
+      transformValue: () => {
+        if (Array.isArray(value)) {
+          return [JSON.stringify(value)];
+        }
+        if (typeof value === "object" && value !== null) {
+          return [JSON.stringify(value)];
+        }
+        if (typeof value === "string") {
+          return [escapeLikePattern(value)];
+        }
+        return [value];
+      }
+    };
+  }
+  /**
+   * $objectContains: True JSON containment for advanced use (deep sub-object match).
+   * Usage: { field: { $objectContains: { ...subobject } } }
+   */
+  // $objectContains: (key: string) => ({
+  //   sql: '', // Will be overridden by transformValue
+  //   needsValue: true,
+  //   transformValue: (value: any) => ({
+  //     sql: `json_type(json_extract(metadata, '$."${toJsonPathKey(key)}"')) = 'object'
+  //         AND json_patch(json_extract(metadata, '$."${toJsonPathKey(key)}"'), ?) = json_extract(metadata, '$."${toJsonPathKey(key)}"')`,
+  //     values: [JSON.stringify(value)],
+  //   }),
+  // }),
+};
+function isFilterResult(obj) {
+  return obj && typeof obj === "object" && typeof obj.sql === "string" && Array.isArray(obj.values);
+}
+var parseJsonPathKey = (key) => {
+  const parsedKey = parseFieldKey(key);
+  return parsedKey.replace(/\./g, '"."');
+};
+function escapeLikePattern(str) {
+  return str.replace(/([%_\\])/g, "\\$1");
+}
+function buildFilterQuery(filter) {
+  if (!filter) {
+    return { sql: "", values: [] };
+  }
+  const values = [];
+  const conditions = Object.entries(filter).map(([key, value]) => {
+    const condition = buildCondition(key, value);
+    values.push(...condition.values);
+    return condition.sql;
+  }).join(" AND ");
+  return {
+    sql: conditions ? `WHERE ${conditions}` : "",
+    values
+  };
+}
+function buildCondition(key, value, parentPath) {
+  if (["$and", "$or", "$not", "$nor"].includes(key)) {
+    return handleLogicalOperator(key, value);
+  }
+  if (!value || typeof value !== "object") {
+    return {
+      sql: `json_extract(metadata, '$."${key.replace(/\./g, '"."')}"') = ?`,
+      values: [value]
+    };
+  }
+  return handleOperator(key, value);
+}
+function handleLogicalOperator(key, value, parentPath) {
+  if (!value || value.length === 0) {
+    switch (key) {
+      case "$and":
+      case "$nor":
+        return { sql: "true", values: [] };
+      case "$or":
+        return { sql: "false", values: [] };
+      case "$not":
+        throw new Error("$not operator cannot be empty");
+      default:
+        return { sql: "true", values: [] };
+    }
+  }
+  if (key === "$not") {
+    const entries = Object.entries(value);
+    const conditions2 = entries.map(([fieldKey, fieldValue]) => buildCondition(fieldKey, fieldValue));
+    return {
+      sql: `NOT (${conditions2.map((c) => c.sql).join(" AND ")})`,
+      values: conditions2.flatMap((c) => c.values)
+    };
+  }
+  const values = [];
+  const joinOperator = key === "$or" || key === "$nor" ? "OR" : "AND";
+  const conditions = Array.isArray(value) ? value.map((f) => {
+    const entries = Object.entries(f);
+    return entries.map(([k, v]) => buildCondition(k, v));
+  }) : [buildCondition(key, value)];
+  const joined = conditions.flat().map((c) => {
+    values.push(...c.values);
+    return c.sql;
+  }).join(` ${joinOperator} `);
+  return {
+    sql: key === "$nor" ? `NOT (${joined})` : `(${joined})`,
+    values
+  };
+}
+function handleOperator(key, value) {
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const entries = Object.entries(value);
+    const results = entries.map(
+      ([operator2, operatorValue2]) => operator2 === "$not" ? {
+        sql: `NOT (${Object.entries(operatorValue2).map(([op, val]) => processOperator(key, op, val).sql).join(" AND ")})`,
+        values: Object.entries(operatorValue2).flatMap(
+          ([op, val]) => processOperator(key, op, val).values
+        )
+      } : processOperator(key, operator2, operatorValue2)
+    );
+    return {
+      sql: `(${results.map((r) => r.sql).join(" AND ")})`,
+      values: results.flatMap((r) => r.values)
+    };
+  }
+  const [[operator, operatorValue] = []] = Object.entries(value);
+  return processOperator(key, operator, operatorValue);
+}
+var processOperator = (key, operator, operatorValue) => {
+  if (!operator.startsWith("$") || !FILTER_OPERATORS[operator]) {
+    throw new Error(`Invalid operator: ${operator}`);
+  }
+  const operatorFn = FILTER_OPERATORS[operator];
+  const operatorResult = operatorFn(key, operatorValue);
+  if (!operatorResult.needsValue) {
+    return { sql: operatorResult.sql, values: [] };
+  }
+  const transformed = operatorResult.transformValue ? operatorResult.transformValue() : operatorValue;
+  if (isFilterResult(transformed)) {
+    return transformed;
+  }
+  return {
+    sql: operatorResult.sql,
+    values: Array.isArray(transformed) ? transformed : [transformed]
+  };
+};
+
+// src/vector/index.ts
+var LibSQLVector = class extends MastraVector {
+  turso;
+  constructor({
+    connectionUrl,
+    authToken,
+    syncUrl,
+    syncInterval
+  }) {
+    super();
+    this.turso = createClient({
+      url: connectionUrl,
+      syncUrl,
+      authToken,
+      syncInterval
+    });
+    if (connectionUrl.includes(`file:`) || connectionUrl.includes(`:memory:`)) {
+      void this.turso.execute({
+        sql: "PRAGMA journal_mode=WAL;",
+        args: {}
+      });
+    }
+  }
+  transformFilter(filter) {
+    const translator = new LibSQLFilterTranslator();
+    return translator.translate(filter);
+  }
+  async query({
+    indexName,
+    queryVector,
+    topK = 10,
+    filter,
+    includeVector = false,
+    minScore = 0
+  }) {
+    try {
+      if (!Number.isInteger(topK) || topK <= 0) {
+        throw new Error("topK must be a positive integer");
+      }
+      if (!Array.isArray(queryVector) || !queryVector.every((x) => typeof x === "number" && Number.isFinite(x))) {
+        throw new Error("queryVector must be an array of finite numbers");
+      }
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      const vectorStr = `[${queryVector.join(",")}]`;
+      const translatedFilter = this.transformFilter(filter);
+      const { sql: filterQuery, values: filterValues } = buildFilterQuery(translatedFilter);
+      filterValues.push(minScore);
+      filterValues.push(topK);
+      const query = `
+        WITH vector_scores AS (
+          SELECT
+            vector_id as id,
+            (1-vector_distance_cos(embedding, '${vectorStr}')) as score,
+            metadata
+            ${includeVector ? ", vector_extract(embedding) as embedding" : ""}
+          FROM ${parsedIndexName}
+          ${filterQuery}
+        )
+        SELECT *
+        FROM vector_scores
+        WHERE score > ?
+        ORDER BY score DESC
+        LIMIT ?`;
+      const result = await this.turso.execute({
+        sql: query,
+        args: filterValues
+      });
+      return result.rows.map(({ id, score, metadata, embedding }) => ({
+        id,
+        score,
+        metadata: JSON.parse(metadata ?? "{}"),
+        ...includeVector && embedding && { vector: JSON.parse(embedding) }
+      }));
+    } finally {
+    }
+  }
+  async upsert({ indexName, vectors, metadata, ids }) {
+    const tx = await this.turso.transaction("write");
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      const vectorIds = ids || vectors.map(() => crypto.randomUUID());
+      for (let i = 0; i < vectors.length; i++) {
+        const query = `
+          INSERT INTO ${parsedIndexName} (vector_id, embedding, metadata)
+          VALUES (?, vector32(?), ?)
+          ON CONFLICT(vector_id) DO UPDATE SET
+            embedding = vector32(?),
+            metadata = ?
+        `;
+        await tx.execute({
+          sql: query,
+          // @ts-ignore
+          args: [
+            vectorIds[i],
+            JSON.stringify(vectors[i]),
+            JSON.stringify(metadata?.[i] || {}),
+            JSON.stringify(vectors[i]),
+            JSON.stringify(metadata?.[i] || {})
+          ]
+        });
+      }
+      await tx.commit();
+      return vectorIds;
+    } catch (error) {
+      await tx.rollback();
+      if (error instanceof Error && error.message?.includes("dimensions are different")) {
+        const match = error.message.match(/dimensions are different: (\d+) != (\d+)/);
+        if (match) {
+          const [, actual, expected] = match;
+          throw new Error(
+            `Vector dimension mismatch: Index "${indexName}" expects ${expected} dimensions but got ${actual} dimensions. Either use a matching embedding model or delete and recreate the index with the new dimension.`
+          );
+        }
+      }
+      throw error;
+    }
+  }
+  async createIndex({ indexName, dimension }) {
+    try {
+      if (!Number.isInteger(dimension) || dimension <= 0) {
+        throw new Error("Dimension must be a positive integer");
+      }
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      await this.turso.execute({
+        sql: `
+        CREATE TABLE IF NOT EXISTS ${parsedIndexName} (
+          id SERIAL PRIMARY KEY,
+          vector_id TEXT UNIQUE NOT NULL,
+          embedding F32_BLOB(${dimension}),
+          metadata TEXT DEFAULT '{}'
+        );
+      `,
+        args: []
+      });
+      await this.turso.execute({
+        sql: `
+        CREATE INDEX IF NOT EXISTS ${parsedIndexName}_vector_idx
+        ON ${parsedIndexName} (libsql_vector_idx(embedding))
+      `,
+        args: []
+      });
+    } catch (error) {
+      console.error("Failed to create vector table:", error);
+      throw error;
+    } finally {
+    }
+  }
+  async deleteIndex({ indexName }) {
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      await this.turso.execute({
+        sql: `DROP TABLE IF EXISTS ${parsedIndexName}`,
+        args: []
+      });
+    } catch (error) {
+      console.error("Failed to delete vector table:", error);
+      throw new Error(`Failed to delete vector table: ${error.message}`);
+    } finally {
+    }
+  }
+  async listIndexes() {
+    try {
+      const vectorTablesQuery = `
+        SELECT name FROM sqlite_master 
+        WHERE type='table' 
+        AND sql LIKE '%F32_BLOB%';
+      `;
+      const result = await this.turso.execute({
+        sql: vectorTablesQuery,
+        args: []
+      });
+      return result.rows.map((row) => row.name);
+    } catch (error) {
+      throw new Error(`Failed to list vector tables: ${error.message}`);
+    }
+  }
+  /**
+   * Retrieves statistics about a vector index.
+   *
+   * @param {string} indexName - The name of the index to describe
+   * @returns A promise that resolves to the index statistics including dimension, count and metric
+   */
+  async describeIndex({ indexName }) {
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      const tableInfoQuery = `
+        SELECT sql 
+        FROM sqlite_master 
+        WHERE type='table' 
+        AND name = ?;
+      `;
+      const tableInfo = await this.turso.execute({
+        sql: tableInfoQuery,
+        args: [parsedIndexName]
+      });
+      if (!tableInfo.rows[0]?.sql) {
+        throw new Error(`Table ${parsedIndexName} not found`);
+      }
+      const dimension = parseInt(tableInfo.rows[0].sql.match(/F32_BLOB\((\d+)\)/)?.[1] || "0");
+      const countQuery = `
+        SELECT COUNT(*) as count
+        FROM ${parsedIndexName};
+      `;
+      const countResult = await this.turso.execute({
+        sql: countQuery,
+        args: []
+      });
+      const metric = "cosine";
+      return {
+        dimension,
+        count: countResult?.rows?.[0]?.count ?? 0,
+        metric
+      };
+    } catch (e) {
+      throw new Error(`Failed to describe vector table: ${e.message}`);
+    }
+  }
+  /**
+   * Updates a vector by its ID with the provided vector and/or metadata.
+   *
+   * @param indexName - The name of the index containing the vector.
+   * @param id - The ID of the vector to update.
+   * @param update - An object containing the vector and/or metadata to update.
+   * @param update.vector - An optional array of numbers representing the new vector.
+   * @param update.metadata - An optional record containing the new metadata.
+   * @returns A promise that resolves when the update is complete.
+   * @throws Will throw an error if no updates are provided or if the update operation fails.
+   */
+  async updateVector({ indexName, id, update }) {
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      const updates = [];
+      const args = [];
+      if (update.vector) {
+        updates.push("embedding = vector32(?)");
+        args.push(JSON.stringify(update.vector));
+      }
+      if (update.metadata) {
+        updates.push("metadata = ?");
+        args.push(JSON.stringify(update.metadata));
+      }
+      if (updates.length === 0) {
+        throw new Error("No updates provided");
+      }
+      args.push(id);
+      const query = `
+        UPDATE ${parsedIndexName}
+        SET ${updates.join(", ")}
+        WHERE vector_id = ?;
+      `;
+      await this.turso.execute({
+        sql: query,
+        args
+      });
+    } catch (error) {
+      throw new Error(`Failed to update vector by id: ${id} for index: ${indexName}: ${error.message}`);
+    }
+  }
+  /**
+   * Deletes a vector by its ID.
+   * @param indexName - The name of the index containing the vector.
+   * @param id - The ID of the vector to delete.
+   * @returns A promise that resolves when the deletion is complete.
+   * @throws Will throw an error if the deletion operation fails.
+   */
+  async deleteVector({ indexName, id }) {
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      await this.turso.execute({
+        sql: `DELETE FROM ${parsedIndexName} WHERE vector_id = ?`,
+        args: [id]
+      });
+    } catch (error) {
+      throw new Error(`Failed to delete vector by id: ${id} for index: ${indexName}: ${error.message}`);
+    }
+  }
+  async truncateIndex({ indexName }) {
+    await this.turso.execute({
+      sql: `DELETE FROM ${parseSqlIdentifier(indexName, "index name")}`,
+      args: []
+    });
+  }
+};
+function safelyParseJSON(jsonString) {
+  try {
+    return JSON.parse(jsonString);
+  } catch {
+    return {};
+  }
+}
+var LibSQLStore = class extends MastraStorage {
+  client;
+  constructor(config) {
+    super({ name: `LibSQLStore` });
+    if (config.url.endsWith(":memory:")) {
+      this.shouldCacheInit = false;
+    }
+    this.client = createClient(config);
+  }
+  getCreateTableSQL(tableName, schema) {
+    const parsedTableName = parseSqlIdentifier(tableName, "table name");
+    const columns = Object.entries(schema).map(([name, col]) => {
+      const parsedColumnName = parseSqlIdentifier(name, "column name");
+      let type = col.type.toUpperCase();
+      if (type === "TEXT") type = "TEXT";
+      if (type === "TIMESTAMP") type = "TEXT";
+      const nullable = col.nullable ? "" : "NOT NULL";
+      const primaryKey = col.primaryKey ? "PRIMARY KEY" : "";
+      return `${parsedColumnName} ${type} ${nullable} ${primaryKey}`.trim();
+    });
+    if (tableName === TABLE_WORKFLOW_SNAPSHOT) {
+      const stmnt = `CREATE TABLE IF NOT EXISTS ${parsedTableName} (
+                ${columns.join(",\n")},
+                PRIMARY KEY (workflow_name, run_id)
+            )`;
+      return stmnt;
+    }
+    return `CREATE TABLE IF NOT EXISTS ${parsedTableName} (${columns.join(", ")})`;
+  }
+  async createTable({
+    tableName,
+    schema
+  }) {
+    try {
+      this.logger.debug(`Creating database table`, { tableName, operation: "schema init" });
+      const sql = this.getCreateTableSQL(tableName, schema);
+      await this.client.execute(sql);
+    } catch (error) {
+      this.logger.error(`Error creating table ${tableName}: ${error}`);
+      throw error;
+    }
+  }
+  async clearTable({ tableName }) {
+    const parsedTableName = parseSqlIdentifier(tableName, "table name");
+    try {
+      await this.client.execute(`DELETE FROM ${parsedTableName}`);
+    } catch (e) {
+      if (e instanceof Error) {
+        this.logger.error(e.message);
+      }
+    }
+  }
+  prepareStatement({ tableName, record }) {
+    const parsedTableName = parseSqlIdentifier(tableName, "table name");
+    const columns = Object.keys(record).map((col) => parseSqlIdentifier(col, "column name"));
+    const values = Object.values(record).map((v) => {
+      if (typeof v === `undefined`) {
+        return null;
+      }
+      if (v instanceof Date) {
+        return v.toISOString();
+      }
+      return typeof v === "object" ? JSON.stringify(v) : v;
+    });
+    const placeholders = values.map(() => "?").join(", ");
+    return {
+      sql: `INSERT OR REPLACE INTO ${parsedTableName} (${columns.join(", ")}) VALUES (${placeholders})`,
+      args: values
+    };
+  }
+  async insert({ tableName, record }) {
+    try {
+      await this.client.execute(
+        this.prepareStatement({
+          tableName,
+          record
+        })
+      );
+    } catch (error) {
+      this.logger.error(`Error upserting into table ${tableName}: ${error}`);
+      throw error;
+    }
+  }
+  async batchInsert({ tableName, records }) {
+    if (records.length === 0) return;
+    try {
+      const batchStatements = records.map((r) => this.prepareStatement({ tableName, record: r }));
+      await this.client.batch(batchStatements, "write");
+    } catch (error) {
+      this.logger.error(`Error upserting into table ${tableName}: ${error}`);
+      throw error;
+    }
+  }
+  async load({ tableName, keys }) {
+    const parsedTableName = parseSqlIdentifier(tableName, "table name");
+    const parsedKeys = Object.keys(keys).map((key) => parseSqlIdentifier(key, "column name"));
+    const conditions = parsedKeys.map((key) => `${key} = ?`).join(" AND ");
+    const values = Object.values(keys);
+    const result = await this.client.execute({
+      sql: `SELECT * FROM ${parsedTableName} WHERE ${conditions} ORDER BY createdAt DESC LIMIT 1`,
+      args: values
+    });
+    if (!result.rows || result.rows.length === 0) {
+      return null;
+    }
+    const row = result.rows[0];
+    const parsed = Object.fromEntries(
+      Object.entries(row || {}).map(([k, v]) => {
+        try {
+          return [k, typeof v === "string" ? v.startsWith("{") || v.startsWith("[") ? JSON.parse(v) : v : v];
+        } catch {
+          return [k, v];
+        }
+      })
+    );
+    return parsed;
+  }
+  async getThreadById({ threadId }) {
+    const result = await this.load({
+      tableName: TABLE_THREADS,
+      keys: { id: threadId }
+    });
+    if (!result) {
+      return null;
+    }
+    return {
+      ...result,
+      metadata: typeof result.metadata === "string" ? JSON.parse(result.metadata) : result.metadata
+    };
+  }
+  async getThreadsByResourceId({ resourceId }) {
+    const result = await this.client.execute({
+      sql: `SELECT * FROM ${TABLE_THREADS} WHERE resourceId = ?`,
+      args: [resourceId]
+    });
+    if (!result.rows) {
+      return [];
+    }
+    return result.rows.map((thread) => ({
+      id: thread.id,
+      resourceId: thread.resourceId,
+      title: thread.title,
+      createdAt: thread.createdAt,
+      updatedAt: thread.updatedAt,
+      metadata: typeof thread.metadata === "string" ? JSON.parse(thread.metadata) : thread.metadata
+    }));
+  }
+  async saveThread({ thread }) {
+    await this.insert({
+      tableName: TABLE_THREADS,
+      record: {
+        ...thread,
+        metadata: JSON.stringify(thread.metadata)
+      }
+    });
+    return thread;
+  }
+  async updateThread({
+    id,
+    title,
+    metadata
+  }) {
+    const thread = await this.getThreadById({ threadId: id });
+    if (!thread) {
+      throw new Error(`Thread ${id} not found`);
+    }
+    const updatedThread = {
+      ...thread,
+      title,
+      metadata: {
+        ...thread.metadata,
+        ...metadata
+      }
+    };
+    await this.client.execute({
+      sql: `UPDATE ${TABLE_THREADS} SET title = ?, metadata = ? WHERE id = ?`,
+      args: [title, JSON.stringify(updatedThread.metadata), id]
+    });
+    return updatedThread;
+  }
+  async deleteThread({ threadId }) {
+    await this.client.execute({
+      sql: `DELETE FROM ${TABLE_THREADS} WHERE id = ?`,
+      args: [threadId]
+    });
+  }
+  parseRow(row) {
+    let content = row.content;
+    try {
+      content = JSON.parse(row.content);
+    } catch {
+    }
+    return {
+      id: row.id,
+      content,
+      role: row.role,
+      type: row.type,
+      createdAt: new Date(row.createdAt),
+      threadId: row.thread_id
+    };
+  }
+  async getMessages({ threadId, selectBy }) {
+    try {
+      const messages = [];
+      const limit = typeof selectBy?.last === `number` ? selectBy.last : 40;
+      if (selectBy?.include?.length) {
+        const includeIds = selectBy.include.map((i) => i.id);
+        const maxPrev = Math.max(...selectBy.include.map((i) => i.withPreviousMessages || 0));
+        const maxNext = Math.max(...selectBy.include.map((i) => i.withNextMessages || 0));
+        const includeResult = await this.client.execute({
+          sql: `
+            WITH numbered_messages AS (
+              SELECT 
+                id,
+                content,
+                role,
+                type,
+                "createdAt",
+                thread_id,
+                ROW_NUMBER() OVER (ORDER BY "createdAt" ASC) as row_num
+              FROM "${TABLE_MESSAGES}"
+              WHERE thread_id = ?
+            ),
+            target_positions AS (
+              SELECT row_num as target_pos
+              FROM numbered_messages
+              WHERE id IN (${includeIds.map(() => "?").join(", ")})
+            )
+            SELECT DISTINCT m.*
+            FROM numbered_messages m
+            CROSS JOIN target_positions t
+            WHERE m.row_num BETWEEN (t.target_pos - ?) AND (t.target_pos + ?)
+            ORDER BY m."createdAt" ASC
+          `,
+          args: [threadId, ...includeIds, maxPrev, maxNext]
+        });
+        if (includeResult.rows) {
+          messages.push(...includeResult.rows.map((row) => this.parseRow(row)));
+        }
+      }
+      const excludeIds = messages.map((m) => m.id);
+      const remainingSql = `
+        SELECT 
+          id, 
+          content, 
+          role, 
+          type,
+          "createdAt", 
+          thread_id
+        FROM "${TABLE_MESSAGES}"
+        WHERE thread_id = ?
+        ${excludeIds.length ? `AND id NOT IN (${excludeIds.map(() => "?").join(", ")})` : ""}
+        ORDER BY "createdAt" DESC
+        LIMIT ?
+      `;
+      const remainingArgs = [threadId, ...excludeIds.length ? excludeIds : [], limit];
+      const remainingResult = await this.client.execute({
+        sql: remainingSql,
+        args: remainingArgs
+      });
+      if (remainingResult.rows) {
+        messages.push(...remainingResult.rows.map((row) => this.parseRow(row)));
+      }
+      messages.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      return messages;
+    } catch (error) {
+      this.logger.error("Error getting messages:", error);
+      throw error;
+    }
+  }
+  async saveMessages({ messages }) {
+    if (messages.length === 0) return messages;
+    try {
+      const threadId = messages[0]?.threadId;
+      if (!threadId) {
+        throw new Error("Thread ID is required");
+      }
+      const batchStatements = messages.map((message) => {
+        const time = message.createdAt || /* @__PURE__ */ new Date();
+        return {
+          sql: `INSERT INTO ${TABLE_MESSAGES} (id, thread_id, content, role, type, createdAt) 
+                VALUES (?, ?, ?, ?, ?, ?)`,
+          args: [
+            message.id,
+            threadId,
+            typeof message.content === "object" ? JSON.stringify(message.content) : message.content,
+            message.role,
+            message.type,
+            time instanceof Date ? time.toISOString() : time
+          ]
+        };
+      });
+      await this.client.batch(batchStatements, "write");
+      return messages;
+    } catch (error) {
+      this.logger.error("Failed to save messages in database: " + error?.message);
+      throw error;
+    }
+  }
+  transformEvalRow(row) {
+    const resultValue = JSON.parse(row.result);
+    const testInfoValue = row.test_info ? JSON.parse(row.test_info) : void 0;
+    if (!resultValue || typeof resultValue !== "object" || !("score" in resultValue)) {
+      throw new Error(`Invalid MetricResult format: ${JSON.stringify(resultValue)}`);
+    }
+    return {
+      input: row.input,
+      output: row.output,
+      result: resultValue,
+      agentName: row.agent_name,
+      metricName: row.metric_name,
+      instructions: row.instructions,
+      testInfo: testInfoValue,
+      globalRunId: row.global_run_id,
+      runId: row.run_id,
+      createdAt: row.created_at
+    };
+  }
+  async getEvalsByAgentName(agentName, type) {
+    try {
+      const baseQuery = `SELECT * FROM ${TABLE_EVALS} WHERE agent_name = ?`;
+      const typeCondition = type === "test" ? " AND test_info IS NOT NULL AND test_info->>'testPath' IS NOT NULL" : type === "live" ? " AND (test_info IS NULL OR test_info->>'testPath' IS NULL)" : "";
+      const result = await this.client.execute({
+        sql: `${baseQuery}${typeCondition} ORDER BY created_at DESC`,
+        args: [agentName]
+      });
+      return result.rows?.map((row) => this.transformEvalRow(row)) ?? [];
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("no such table")) {
+        return [];
+      }
+      this.logger.error("Failed to get evals for the specified agent: " + error?.message);
+      throw error;
+    }
+  }
+  // TODO: add types
+  async getTraces({
+    name,
+    scope,
+    page,
+    perPage,
+    attributes,
+    filters,
+    fromDate,
+    toDate
+  } = {
+    page: 0,
+    perPage: 100
+  }) {
+    const limit = perPage;
+    const offset = page * perPage;
+    const args = [];
+    const conditions = [];
+    if (name) {
+      conditions.push("name LIKE CONCAT(?, '%')");
+    }
+    if (scope) {
+      conditions.push("scope = ?");
+    }
+    if (attributes) {
+      Object.keys(attributes).forEach((key) => {
+        conditions.push(`attributes->>'$.${key}' = ?`);
+      });
+    }
+    if (filters) {
+      Object.entries(filters).forEach(([key, _value]) => {
+        conditions.push(`${key} = ?`);
+      });
+    }
+    if (fromDate) {
+      conditions.push("createdAt >= ?");
+    }
+    if (toDate) {
+      conditions.push("createdAt <= ?");
+    }
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    if (name) {
+      args.push(name);
+    }
+    if (scope) {
+      args.push(scope);
+    }
+    if (attributes) {
+      for (const [, value] of Object.entries(attributes)) {
+        args.push(value);
+      }
+    }
+    if (filters) {
+      for (const [, value] of Object.entries(filters)) {
+        args.push(value);
+      }
+    }
+    if (fromDate) {
+      args.push(fromDate.toISOString());
+    }
+    if (toDate) {
+      args.push(toDate.toISOString());
+    }
+    args.push(limit, offset);
+    const result = await this.client.execute({
+      sql: `SELECT * FROM ${TABLE_TRACES} ${whereClause} ORDER BY "startTime" DESC LIMIT ? OFFSET ?`,
+      args
+    });
+    if (!result.rows) {
+      return [];
+    }
+    return result.rows.map((row) => ({
+      id: row.id,
+      parentSpanId: row.parentSpanId,
+      traceId: row.traceId,
+      name: row.name,
+      scope: row.scope,
+      kind: row.kind,
+      status: safelyParseJSON(row.status),
+      events: safelyParseJSON(row.events),
+      links: safelyParseJSON(row.links),
+      attributes: safelyParseJSON(row.attributes),
+      startTime: row.startTime,
+      endTime: row.endTime,
+      other: safelyParseJSON(row.other),
+      createdAt: row.createdAt
+    }));
+  }
+  async getWorkflowRuns({
+    workflowName,
+    fromDate,
+    toDate,
+    limit,
+    offset,
+    resourceId
+  } = {}) {
+    try {
+      const conditions = [];
+      const args = [];
+      if (workflowName) {
+        conditions.push("workflow_name = ?");
+        args.push(workflowName);
+      }
+      if (fromDate) {
+        conditions.push("createdAt >= ?");
+        args.push(fromDate.toISOString());
+      }
+      if (toDate) {
+        conditions.push("createdAt <= ?");
+        args.push(toDate.toISOString());
+      }
+      if (resourceId) {
+        const hasResourceId = await this.hasColumn(TABLE_WORKFLOW_SNAPSHOT, "resourceId");
+        if (hasResourceId) {
+          conditions.push("resourceId = ?");
+          args.push(resourceId);
+        } else {
+          console.warn(`[${TABLE_WORKFLOW_SNAPSHOT}] resourceId column not found. Skipping resourceId filter.`);
+        }
+      }
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+      let total = 0;
+      if (limit !== void 0 && offset !== void 0) {
+        const countResult = await this.client.execute({
+          sql: `SELECT COUNT(*) as count FROM ${TABLE_WORKFLOW_SNAPSHOT} ${whereClause}`,
+          args
+        });
+        total = Number(countResult.rows?.[0]?.count ?? 0);
+      }
+      const result = await this.client.execute({
+        sql: `SELECT * FROM ${TABLE_WORKFLOW_SNAPSHOT} ${whereClause} ORDER BY createdAt DESC${limit !== void 0 && offset !== void 0 ? ` LIMIT ? OFFSET ?` : ""}`,
+        args: limit !== void 0 && offset !== void 0 ? [...args, limit, offset] : args
+      });
+      const runs = (result.rows || []).map((row) => this.parseWorkflowRun(row));
+      return { runs, total: total || runs.length };
+    } catch (error) {
+      console.error("Error getting workflow runs:", error);
+      throw error;
+    }
+  }
+  async getWorkflowRunById({
+    runId,
+    workflowName
+  }) {
+    const conditions = [];
+    const args = [];
+    if (runId) {
+      conditions.push("run_id = ?");
+      args.push(runId);
+    }
+    if (workflowName) {
+      conditions.push("workflow_name = ?");
+      args.push(workflowName);
+    }
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const result = await this.client.execute({
+      sql: `SELECT * FROM ${TABLE_WORKFLOW_SNAPSHOT} ${whereClause}`,
+      args
+    });
+    if (!result.rows?.[0]) {
+      return null;
+    }
+    return this.parseWorkflowRun(result.rows[0]);
+  }
+  async hasColumn(table, column) {
+    const result = await this.client.execute({
+      sql: `PRAGMA table_info(${table})`
+    });
+    return (await result.rows)?.some((row) => row.name === column);
+  }
+  parseWorkflowRun(row) {
+    let parsedSnapshot = row.snapshot;
+    if (typeof parsedSnapshot === "string") {
+      try {
+        parsedSnapshot = JSON.parse(row.snapshot);
+      } catch (e) {
+        console.warn(`Failed to parse snapshot for workflow ${row.workflow_name}: ${e}`);
+      }
+    }
+    return {
+      workflowName: row.workflow_name,
+      runId: row.run_id,
+      snapshot: parsedSnapshot,
+      resourceId: row.resourceId,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at)
+    };
+  }
+};
+
+var memoryDefaultOptions = {
+  lastMessages: 10,
+  semanticRecall: false,
+  threads: {
+    generateTitle: false
+  },
+  workingMemory: {
+    enabled: false,
+    template: `
+# User Information
+- **First Name**: 
+- **Last Name**: 
+- **Location**: 
+- **Occupation**: 
+- **Interests**: 
+- **Goals**: 
+- **Events**: 
+- **Facts**: 
+- **Projects**: 
+`
+  }
+};
+var MastraMemory = class extends MastraBase {
+  MAX_CONTEXT_TOKENS;
+  _storage;
+  vector;
+  embedder;
+  processors = [];
+  threadConfig = { ...memoryDefaultOptions };
+  constructor(config) {
+    super({ component: "MEMORY", name: config.name });
+    if (config.options) this.threadConfig = this.getMergedThreadConfig(config.options);
+    if (config.processors) this.processors = config.processors;
+    if (config.storage) {
+      this._storage = augmentWithInit(config.storage);
+      this._hasOwnStorage = true;
+    }
+    if (this.threadConfig.semanticRecall) {
+      if (!config.vector) {
+        throw new Error(
+          `Semantic recall requires a vector store to be configured.
+
+https://mastra.ai/en/docs/memory/semantic-recall`
+        );
+      }
+      this.vector = config.vector;
+      if (!config.embedder) {
+        throw new Error(
+          `Semantic recall requires an embedder to be configured.
+
+https://mastra.ai/en/docs/memory/semantic-recall`
+        );
+      }
+      this.embedder = config.embedder;
+    }
+  }
+  _hasOwnStorage = false;
+  get hasOwnStorage() {
+    return this._hasOwnStorage;
+  }
+  get storage() {
+    if (!this._storage) {
+      throw new Error(
+        `Memory requires a storage provider to function. Add a storage configuration to Memory or to your Mastra instance.
+
+https://mastra.ai/en/docs/memory/overview`
+      );
+    }
+    return this._storage;
+  }
+  setStorage(storage) {
+    this._storage = storage;
+  }
+  setVector(vector) {
+    this.vector = vector;
+  }
+  setEmbedder(embedder) {
+    this.embedder = embedder;
+  }
+  /**
+   * Get a system message to inject into the conversation.
+   * This will be called before each conversation turn.
+   * Implementations can override this to inject custom system messages.
+   */
+  async getSystemMessage(_input) {
+    return null;
+  }
+  /**
+   * Get tools that should be available to the agent.
+   * This will be called when converting tools for the agent.
+   * Implementations can override this to provide additional tools.
+   */
+  getTools(_config) {
+    return {};
+  }
+  async createEmbeddingIndex(dimensions) {
+    const defaultDimensions = 1536;
+    const isDefault = dimensions === defaultDimensions;
+    const usedDimensions = dimensions ?? defaultDimensions;
+    const separator = this.vector?.indexSeparator ?? "_";
+    const indexName = isDefault ? `memory${separator}messages` : `memory${separator}messages${separator}${usedDimensions}`;
+    if (typeof this.vector === `undefined`) {
+      throw new Error(`Tried to create embedding index but no vector db is attached to this Memory instance.`);
+    }
+    await this.vector.createIndex({
+      indexName,
+      dimension: usedDimensions
+    });
+    return { indexName };
+  }
+  getMergedThreadConfig(config) {
+    if (config?.workingMemory && "use" in config.workingMemory) {
+      throw new Error("The workingMemory.use option has been removed. Working memory always uses tool-call mode.");
+    }
+    return deepMerge(this.threadConfig, config || {});
+  }
+  /**
+   * Apply all configured message processors to a list of messages.
+   * @param messages The messages to process
+   * @returns The processed messages
+   */
+  applyProcessors(messages, opts) {
+    const processors = opts.processors || this.processors;
+    if (!processors || processors.length === 0) {
+      return messages;
+    }
+    let processedMessages = [...messages];
+    for (const processor of processors) {
+      processedMessages = processor.process(processedMessages, {
+        systemMessage: opts.systemMessage,
+        newMessages: opts.newMessages,
+        memorySystemMessage: opts.memorySystemMessage
+      });
+    }
+    return processedMessages;
+  }
+  processMessages({
+    messages,
+    processors,
+    ...opts
+  }) {
+    return this.applyProcessors(messages, { processors: processors || this.processors, ...opts });
+  }
+  estimateTokens(text) {
+    return Math.ceil(text.split(" ").length * 1.3);
+  }
+  parseMessages(messages) {
+    return messages.map((msg) => {
+      let content = msg.content;
+      if (typeof content === "string" && (content.startsWith("[") || content.startsWith("{"))) {
+        try {
+          content = JSON.parse(content);
+        } catch {
+        }
+      } else if (typeof content === "number") {
+        content = String(content);
+      }
+      return {
+        ...msg,
+        content
+      };
+    });
+  }
+  convertToUIMessages(messages) {
+    function addToolMessageToChat({
+      toolMessage,
+      messages: messages2,
+      toolResultContents
+    }) {
+      const chatMessages2 = messages2.map((message) => {
+        if (message.toolInvocations) {
+          return {
+            ...message,
+            toolInvocations: message.toolInvocations.map((toolInvocation) => {
+              const toolResult = toolMessage.content.find((tool) => tool.toolCallId === toolInvocation.toolCallId);
+              if (toolResult) {
+                return {
+                  ...toolInvocation,
+                  state: "result",
+                  result: toolResult.result
+                };
+              }
+              return toolInvocation;
+            })
+          };
+        }
+        return message;
+      });
+      const resultContents = [...toolResultContents, ...toolMessage.content];
+      return { chatMessages: chatMessages2, toolResultContents: resultContents };
+    }
+    const { chatMessages } = messages.reduce(
+      (obj, message) => {
+        if (message.role === "tool") {
+          return addToolMessageToChat({
+            toolMessage: message,
+            messages: obj.chatMessages,
+            toolResultContents: obj.toolResultContents
+          });
+        }
+        let textContent = "";
+        let toolInvocations = [];
+        if (typeof message.content === "string") {
+          textContent = message.content;
+        } else if (typeof message.content === "number") {
+          textContent = String(message.content);
+        } else if (Array.isArray(message.content)) {
+          for (const content of message.content) {
+            if (content.type === "text") {
+              textContent += content.text;
+            } else if (content.type === "tool-call") {
+              const toolResult = obj.toolResultContents.find((tool) => tool.toolCallId === content.toolCallId);
+              toolInvocations.push({
+                state: toolResult ? "result" : "call",
+                toolCallId: content.toolCallId,
+                toolName: content.toolName,
+                args: content.args,
+                result: toolResult?.result
+              });
+            }
+          }
+        }
+        obj.chatMessages.push({
+          id: message.id,
+          role: message.role,
+          content: textContent,
+          toolInvocations,
+          createdAt: message.createdAt
+        });
+        return obj;
+      },
+      { chatMessages: [], toolResultContents: [] }
+    );
+    return chatMessages;
+  }
+  /**
+   * Helper method to create a new thread
+   * @param title - Optional title for the thread
+   * @param metadata - Optional metadata for the thread
+   * @returns Promise resolving to the created thread
+   */
+  async createThread({
+    threadId,
+    resourceId,
+    title,
+    metadata,
+    memoryConfig
+  }) {
+    await this.storage.init();
+    const thread = {
+      id: threadId || this.generateId(),
+      title: title || `New Thread ${(/* @__PURE__ */ new Date()).toISOString()}`,
+      resourceId,
+      createdAt: /* @__PURE__ */ new Date(),
+      updatedAt: /* @__PURE__ */ new Date(),
+      metadata
+    };
+    return this.saveThread({ thread, memoryConfig });
+  }
+  /**
+   * Helper method to add a single message to a thread
+   * @param threadId - The thread to add the message to
+   * @param content - The message content
+   * @param role - The role of the message sender
+   * @param type - The type of the message
+   * @param toolNames - Optional array of tool names that were called
+   * @param toolCallArgs - Optional array of tool call arguments
+   * @param toolCallIds - Optional array of tool call ids
+   * @returns Promise resolving to the saved message
+   */
+  async addMessage({
+    threadId,
+    resourceId,
+    config,
+    content,
+    role,
+    type,
+    toolNames,
+    toolCallArgs,
+    toolCallIds
+  }) {
+    const message = {
+      id: this.generateId(),
+      content,
+      role,
+      createdAt: /* @__PURE__ */ new Date(),
+      threadId,
+      resourceId,
+      type,
+      toolNames,
+      toolCallArgs,
+      toolCallIds
+    };
+    const savedMessages = await this.saveMessages({ messages: [message], memoryConfig: config });
+    return savedMessages[0];
+  }
+  /**
+   * Generates a unique identifier
+   * @returns A unique string ID
+   */
+  generateId() {
+    return crypto.randomUUID();
+  }
+};
+
+const t=new Uint8Array([0,97,115,109,1,0,0,0,1,48,8,96,3,127,127,127,1,127,96,3,127,127,127,0,96,2,127,127,0,96,1,127,1,127,96,3,127,127,126,1,126,96,3,126,127,127,1,126,96,2,127,126,0,96,1,127,1,126,3,11,10,0,0,2,1,3,4,5,6,1,7,5,3,1,0,1,7,85,9,3,109,101,109,2,0,5,120,120,104,51,50,0,0,6,105,110,105,116,51,50,0,2,8,117,112,100,97,116,101,51,50,0,3,8,100,105,103,101,115,116,51,50,0,4,5,120,120,104,54,52,0,5,6,105,110,105,116,54,52,0,7,8,117,112,100,97,116,101,54,52,0,8,8,100,105,103,101,115,116,54,52,0,9,10,251,22,10,242,1,1,4,127,32,0,32,1,106,33,3,32,1,65,16,79,4,127,32,3,65,16,107,33,6,32,2,65,168,136,141,161,2,106,33,3,32,2,65,137,235,208,208,7,107,33,4,32,2,65,207,140,162,142,6,106,33,5,3,64,32,3,32,0,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,3,32,4,32,0,65,4,106,34,0,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,4,32,2,32,0,65,4,106,34,0,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,2,32,5,32,0,65,4,106,34,0,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,5,32,6,32,0,65,4,106,34,0,79,13,0,11,32,2,65,12,119,32,5,65,18,119,106,32,4,65,7,119,106,32,3,65,1,119,106,5,32,2,65,177,207,217,178,1,106,11,32,1,106,32,0,32,1,65,15,113,16,1,11,146,1,0,32,1,32,2,106,33,2,3,64,32,1,65,4,106,32,2,75,69,4,64,32,0,32,1,40,2,0,65,189,220,202,149,124,108,106,65,17,119,65,175,214,211,190,2,108,33,0,32,1,65,4,106,33,1,12,1,11,11,3,64,32,1,32,2,79,69,4,64,32,0,32,1,45,0,0,65,177,207,217,178,1,108,106,65,11,119,65,177,243,221,241,121,108,33,0,32,1,65,1,106,33,1,12,1,11,11,32,0,32,0,65,15,118,115,65,247,148,175,175,120,108,34,0,65,13,118,32,0,115,65,189,220,202,149,124,108,34,0,65,16,118,32,0,115,11,63,0,32,0,65,8,106,32,1,65,168,136,141,161,2,106,54,2,0,32,0,65,12,106,32,1,65,137,235,208,208,7,107,54,2,0,32,0,65,16,106,32,1,54,2,0,32,0,65,20,106,32,1,65,207,140,162,142,6,106,54,2,0,11,195,4,1,6,127,32,1,32,2,106,33,6,32,0,65,24,106,33,4,32,0,65,40,106,40,2,0,33,3,32,0,32,0,40,2,0,32,2,106,54,2,0,32,0,65,4,106,34,5,32,5,40,2,0,32,2,65,16,79,32,0,40,2,0,65,16,79,114,114,54,2,0,32,2,32,3,106,65,16,73,4,64,32,3,32,4,106,32,1,32,2,252,10,0,0,32,0,65,40,106,32,2,32,3,106,54,2,0,15,11,32,3,4,64,32,3,32,4,106,32,1,65,16,32,3,107,34,2,252,10,0,0,32,0,65,8,106,34,3,32,3,40,2,0,32,4,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,54,2,0,32,0,65,12,106,34,3,32,3,40,2,0,32,4,65,4,106,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,54,2,0,32,0,65,16,106,34,3,32,3,40,2,0,32,4,65,8,106,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,54,2,0,32,0,65,20,106,34,3,32,3,40,2,0,32,4,65,12,106,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,54,2,0,32,0,65,40,106,65,0,54,2,0,32,1,32,2,106,33,1,11,32,1,32,6,65,16,107,77,4,64,32,6,65,16,107,33,8,32,0,65,8,106,40,2,0,33,2,32,0,65,12,106,40,2,0,33,3,32,0,65,16,106,40,2,0,33,5,32,0,65,20,106,40,2,0,33,7,3,64,32,2,32,1,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,2,32,3,32,1,65,4,106,34,1,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,3,32,5,32,1,65,4,106,34,1,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,5,32,7,32,1,65,4,106,34,1,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,7,32,8,32,1,65,4,106,34,1,79,13,0,11,32,0,65,8,106,32,2,54,2,0,32,0,65,12,106,32,3,54,2,0,32,0,65,16,106,32,5,54,2,0,32,0,65,20,106,32,7,54,2,0,11,32,1,32,6,73,4,64,32,4,32,1,32,6,32,1,107,34,1,252,10,0,0,32,0,65,40,106,32,1,54,2,0,11,11,97,1,1,127,32,0,65,16,106,40,2,0,33,1,32,0,65,4,106,40,2,0,4,127,32,1,65,12,119,32,0,65,20,106,40,2,0,65,18,119,106,32,0,65,12,106,40,2,0,65,7,119,106,32,0,65,8,106,40,2,0,65,1,119,106,5,32,1,65,177,207,217,178,1,106,11,32,0,40,2,0,106,32,0,65,24,106,32,0,65,40,106,40,2,0,16,1,11,255,3,2,3,126,1,127,32,0,32,1,106,33,6,32,1,65,32,79,4,126,32,6,65,32,107,33,6,32,2,66,214,235,130,238,234,253,137,245,224,0,124,33,3,32,2,66,177,169,172,193,173,184,212,166,61,125,33,4,32,2,66,249,234,208,208,231,201,161,228,225,0,124,33,5,3,64,32,3,32,0,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,3,32,4,32,0,65,8,106,34,0,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,4,32,2,32,0,65,8,106,34,0,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,2,32,5,32,0,65,8,106,34,0,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,5,32,6,32,0,65,8,106,34,0,79,13,0,11,32,2,66,12,137,32,5,66,18,137,124,32,4,66,7,137,124,32,3,66,1,137,124,32,3,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,4,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,2,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,5,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,5,32,2,66,197,207,217,178,241,229,186,234,39,124,11,32,1,173,124,32,0,32,1,65,31,113,16,6,11,134,2,0,32,1,32,2,106,33,2,3,64,32,2,32,1,65,8,106,79,4,64,32,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,32,0,133,66,27,137,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,33,0,32,1,65,8,106,33,1,12,1,11,11,32,1,65,4,106,32,2,77,4,64,32,0,32,1,53,2,0,66,135,149,175,175,152,182,222,155,158,127,126,133,66,23,137,66,207,214,211,190,210,199,171,217,66,126,66,249,243,221,241,153,246,153,171,22,124,33,0,32,1,65,4,106,33,1,11,3,64,32,1,32,2,73,4,64,32,0,32,1,49,0,0,66,197,207,217,178,241,229,186,234,39,126,133,66,11,137,66,135,149,175,175,152,182,222,155,158,127,126,33,0,32,1,65,1,106,33,1,12,1,11,11,32,0,32,0,66,33,136,133,66,207,214,211,190,210,199,171,217,66,126,34,0,32,0,66,29,136,133,66,249,243,221,241,153,246,153,171,22,126,34,0,32,0,66,32,136,133,11,77,0,32,0,65,8,106,32,1,66,214,235,130,238,234,253,137,245,224,0,124,55,3,0,32,0,65,16,106,32,1,66,177,169,172,193,173,184,212,166,61,125,55,3,0,32,0,65,24,106,32,1,55,3,0,32,0,65,32,106,32,1,66,249,234,208,208,231,201,161,228,225,0,124,55,3,0,11,244,4,2,3,127,4,126,32,1,32,2,106,33,5,32,0,65,40,106,33,4,32,0,65,200,0,106,40,2,0,33,3,32,0,32,0,41,3,0,32,2,173,124,55,3,0,32,2,32,3,106,65,32,73,4,64,32,3,32,4,106,32,1,32,2,252,10,0,0,32,0,65,200,0,106,32,2,32,3,106,54,2,0,15,11,32,3,4,64,32,3,32,4,106,32,1,65,32,32,3,107,34,2,252,10,0,0,32,0,65,8,106,34,3,32,3,41,3,0,32,4,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,55,3,0,32,0,65,16,106,34,3,32,3,41,3,0,32,4,65,8,106,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,55,3,0,32,0,65,24,106,34,3,32,3,41,3,0,32,4,65,16,106,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,55,3,0,32,0,65,32,106,34,3,32,3,41,3,0,32,4,65,24,106,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,55,3,0,32,0,65,200,0,106,65,0,54,2,0,32,1,32,2,106,33,1,11,32,1,65,32,106,32,5,77,4,64,32,5,65,32,107,33,2,32,0,65,8,106,41,3,0,33,6,32,0,65,16,106,41,3,0,33,7,32,0,65,24,106,41,3,0,33,8,32,0,65,32,106,41,3,0,33,9,3,64,32,6,32,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,6,32,7,32,1,65,8,106,34,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,7,32,8,32,1,65,8,106,34,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,8,32,9,32,1,65,8,106,34,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,9,32,2,32,1,65,8,106,34,1,79,13,0,11,32,0,65,8,106,32,6,55,3,0,32,0,65,16,106,32,7,55,3,0,32,0,65,24,106,32,8,55,3,0,32,0,65,32,106,32,9,55,3,0,11,32,1,32,5,73,4,64,32,4,32,1,32,5,32,1,107,34,1,252,10,0,0,32,0,65,200,0,106,32,1,54,2,0,11,11,188,2,1,5,126,32,0,65,24,106,41,3,0,33,1,32,0,41,3,0,34,2,66,32,90,4,126,32,0,65,8,106,41,3,0,34,3,66,1,137,32,0,65,16,106,41,3,0,34,4,66,7,137,124,32,1,66,12,137,32,0,65,32,106,41,3,0,34,5,66,18,137,124,124,32,3,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,4,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,1,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,5,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,5,32,1,66,197,207,217,178,241,229,186,234,39,124,11,32,2,124,32,0,65,40,106,32,2,66,31,131,167,16,6,11]);async function e(){return function(t){const{exports:{mem:e,xxh32:n,xxh64:r,init32:i,update32:a,digest32:o,init64:s,update64:u,digest64:c}}=t;let h=new Uint8Array(e.buffer);function g(t,n){if(e.buffer.byteLength<t+n){const r=Math.ceil((t+n-e.buffer.byteLength)/65536);e.grow(r),h=new Uint8Array(e.buffer);}}function f(t,e,n,r,i,a){g(t);const o=new Uint8Array(t);return h.set(o),n(0,e),o.set(h.subarray(0,t)),{update(e){let n;return h.set(o),"string"==typeof e?(g(3*e.length,t),n=w.encodeInto(e,h.subarray(t)).written):(g(e.byteLength,t),h.set(e,t),n=e.byteLength),r(0,t,n),o.set(h.subarray(0,t)),this},digest:()=>(h.set(o),a(i(0)))}}function y(t){return t>>>0}const b=2n**64n-1n;function d(t){return t&b}const w=new TextEncoder,l=0,p=0n;function x(t,e=l){return g(3*t.length,0),y(n(0,w.encodeInto(t,h).written,e))}function L(t,e=p){return g(3*t.length,0),d(r(0,w.encodeInto(t,h).written,e))}return {h32:x,h32ToString:(t,e=l)=>x(t,e).toString(16).padStart(8,"0"),h32Raw:(t,e=l)=>(g(t.byteLength,0),h.set(t),y(n(0,t.byteLength,e))),create32:(t=l)=>f(48,t,i,a,o,y),h64:L,h64ToString:(t,e=p)=>L(t,e).toString(16).padStart(16,"0"),h64Raw:(t,e=p)=>(g(t.byteLength,0),h.set(t),d(r(0,t.byteLength,e))),create64:(t=p)=>f(88,t,s,u,c,d)}}((await WebAssembly.instantiate(t)).instance)}
+
+// src/index.ts
+var updateWorkingMemoryTool = {
+  description: "Update the working memory with new information",
+  parameters: objectType({
+    memory: stringType().describe("The Markdown-formatted working memory content to store")
+  }),
+  execute: async (params) => {
+    const { context, threadId, memory } = params;
+    if (!threadId || !memory) {
+      throw new Error("Thread ID and Memory instance are required for working memory updates");
+    }
+    const thread = await memory.getThreadById({ threadId });
+    if (!thread) {
+      throw new Error(`Thread ${threadId} not found`);
+    }
+    await memory.saveThread({
+      thread: {
+        ...thread,
+        metadata: {
+          ...thread.metadata,
+          workingMemory: context.memory
+        }
+      }
+    });
+    return { success: true };
+  }
+};
+
+// src/utils/index.ts
+var isToolCallWithId = (message, targetToolCallId) => {
+  if (!message || !Array.isArray(message.content)) return false;
+  return message.content.some(
+    (part) => part && typeof part === "object" && "type" in part && part.type === "tool-call" && "toolCallId" in part && part.toolCallId === targetToolCallId
+  );
+};
+var getToolResultIndexById = (id, results) => results.findIndex((message) => {
+  if (!Array.isArray(message?.content)) return false;
+  return message.content.some(
+    (part) => part && typeof part === "object" && "type" in part && part.type === "tool-result" && "toolCallId" in part && part.toolCallId === id
+  );
+});
+function reorderToolCallsAndResults(messages) {
+  if (!messages.length) return messages;
+  const results = [...messages];
+  const toolCallIds = /* @__PURE__ */ new Set();
+  for (const message of results) {
+    if (!Array.isArray(message.content)) continue;
+    for (const part of message.content) {
+      if (part && typeof part === "object" && "type" in part && part.type === "tool-result" && "toolCallId" in part && part.toolCallId) {
+        toolCallIds.add(part.toolCallId);
+      }
+    }
+  }
+  for (const toolCallId of toolCallIds) {
+    const resultIndex = getToolResultIndexById(toolCallId, results);
+    const oneMessagePrev = results[resultIndex - 1];
+    if (isToolCallWithId(oneMessagePrev, toolCallId)) {
+      continue;
+    }
+    const toolCallIndex = results.findIndex((message) => isToolCallWithId(message, toolCallId));
+    if (toolCallIndex !== -1 && toolCallIndex !== resultIndex - 1) {
+      const toolCall = results[toolCallIndex];
+      if (!toolCall) continue;
+      results.splice(toolCallIndex, 1);
+      results.splice(getToolResultIndexById(toolCallId, results), 0, toolCall);
+    }
+  }
+  return results;
+}
+
+// src/index.ts
+var CHARS_PER_TOKEN = 4;
+var DEFAULT_MESSAGE_RANGE = { before: 2, after: 2 };
+var DEFAULT_TOP_K = 2;
+var Memory = class extends MastraMemory {
+  constructor(config = {}) {
+    super({ name: "Memory", ...config });
+    const mergedConfig = this.getMergedThreadConfig({
+      workingMemory: config.options?.workingMemory || {
+        // these defaults are now set inside @mastra/core/memory in getMergedThreadConfig.
+        // In a future release we can remove it from this block - for now if we remove it
+        // and someone bumps @mastra/memory without bumping @mastra/core the defaults wouldn't exist yet
+        enabled: false,
+        template: this.defaultWorkingMemoryTemplate
+      }
+    });
+    this.threadConfig = mergedConfig;
+  }
+  async validateThreadIsOwnedByResource(threadId, resourceId) {
+    await this.storage.init();
+    const thread = await this.storage.getThreadById({ threadId });
+    if (!thread) {
+      throw new Error(`No thread found with id ${threadId}`);
+    }
+    if (thread.resourceId !== resourceId) {
+      throw new Error(
+        `Thread with id ${threadId} is for resource with id ${thread.resourceId} but resource ${resourceId} was queried.`
+      );
+    }
+  }
+  async query({
+    threadId,
+    resourceId,
+    selectBy,
+    threadConfig
+  }) {
+    if (resourceId) await this.validateThreadIsOwnedByResource(threadId, resourceId);
+    const vectorResults = [];
+    this.logger.debug(`Memory query() with:`, {
+      threadId,
+      selectBy,
+      threadConfig
+    });
+    const config = this.getMergedThreadConfig(threadConfig || {});
+    const defaultRange = DEFAULT_MESSAGE_RANGE;
+    const defaultTopK = DEFAULT_TOP_K;
+    const vectorConfig = typeof config?.semanticRecall === `boolean` ? {
+      topK: defaultTopK,
+      messageRange: defaultRange
+    } : {
+      topK: config?.semanticRecall?.topK ?? defaultTopK,
+      messageRange: config?.semanticRecall?.messageRange ?? defaultRange
+    };
+    if (config?.semanticRecall && selectBy?.vectorSearchString && this.vector && !!selectBy.vectorSearchString) {
+      const { embeddings, dimension } = await this.embedMessageContent(selectBy.vectorSearchString);
+      const { indexName } = await this.createEmbeddingIndex(dimension);
+      await Promise.all(
+        embeddings.map(async (embedding) => {
+          if (typeof this.vector === `undefined`) {
+            throw new Error(
+              `Tried to query vector index ${indexName} but this Memory instance doesn't have an attached vector db.`
+            );
+          }
+          vectorResults.push(
+            ...await this.vector.query({
+              indexName,
+              queryVector: embedding,
+              topK: vectorConfig.topK,
+              filter: {
+                thread_id: threadId
+              }
+            })
+          );
+        })
+      );
+    }
+    await this.storage.init();
+    const rawMessages = await this.storage.getMessages({
+      threadId,
+      selectBy: {
+        ...selectBy,
+        ...vectorResults?.length ? {
+          include: vectorResults.map((r) => ({
+            id: r.metadata?.message_id,
+            withNextMessages: typeof vectorConfig.messageRange === "number" ? vectorConfig.messageRange : vectorConfig.messageRange.after,
+            withPreviousMessages: typeof vectorConfig.messageRange === "number" ? vectorConfig.messageRange : vectorConfig.messageRange.before
+          }))
+        } : {}
+      },
+      threadConfig: config
+    });
+    const orderedByDate = rawMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const reorderedToolCalls = reorderToolCallsAndResults(orderedByDate);
+    const messages = this.parseMessages(reorderedToolCalls);
+    const uiMessages = this.convertToUIMessages(reorderedToolCalls);
+    return { messages, uiMessages };
+  }
+  async rememberMessages({
+    threadId,
+    resourceId,
+    vectorMessageSearch,
+    config
+  }) {
+    if (resourceId) await this.validateThreadIsOwnedByResource(threadId, resourceId);
+    const threadConfig = this.getMergedThreadConfig(config || {});
+    if (!threadConfig.lastMessages && !threadConfig.semanticRecall) {
+      return {
+        messages: [],
+        uiMessages: [],
+        threadId
+      };
+    }
+    const messagesResult = await this.query({
+      threadId,
+      selectBy: {
+        last: threadConfig.lastMessages,
+        vectorSearchString: threadConfig.semanticRecall && vectorMessageSearch ? vectorMessageSearch : void 0
+      },
+      threadConfig: config
+    });
+    this.logger.debug(`Remembered message history includes ${messagesResult.messages.length} messages.`);
+    return {
+      threadId,
+      messages: messagesResult.messages,
+      uiMessages: messagesResult.uiMessages
+    };
+  }
+  async getThreadById({ threadId }) {
+    await this.storage.init();
+    return this.storage.getThreadById({ threadId });
+  }
+  async getThreadsByResourceId({ resourceId }) {
+    await this.storage.init();
+    return this.storage.getThreadsByResourceId({ resourceId });
+  }
+  async saveThread({
+    thread,
+    memoryConfig
+  }) {
+    await this.storage.init();
+    const config = this.getMergedThreadConfig(memoryConfig || {});
+    if (config.workingMemory?.enabled && !thread?.metadata?.workingMemory) {
+      return this.storage.saveThread({
+        thread: deepMerge(thread, {
+          metadata: {
+            workingMemory: config.workingMemory.template || this.defaultWorkingMemoryTemplate
+          }
+        })
+      });
+    }
+    return this.storage.saveThread({ thread });
+  }
+  async updateThread({
+    id,
+    title,
+    metadata
+  }) {
+    await this.storage.init();
+    return this.storage.updateThread({
+      id,
+      title,
+      metadata
+    });
+  }
+  async deleteThread(threadId) {
+    await this.storage.init();
+    await this.storage.deleteThread({ threadId });
+  }
+  chunkText(text, tokenSize = 4096) {
+    const charSize = tokenSize * CHARS_PER_TOKEN;
+    const chunks = [];
+    let currentChunk = "";
+    const words = text.split(/\s+/);
+    for (const word of words) {
+      const wordWithSpace = currentChunk ? " " + word : word;
+      if (currentChunk.length + wordWithSpace.length > charSize) {
+        chunks.push(currentChunk);
+        currentChunk = word;
+      } else {
+        currentChunk += wordWithSpace;
+      }
+    }
+    if (currentChunk) {
+      chunks.push(currentChunk);
+    }
+    return chunks;
+  }
+  hasher = e();
+  // embedding is computationally expensive so cache content -> embeddings/chunks
+  embeddingCache = /* @__PURE__ */ new Map();
+  firstEmbed;
+  async embedMessageContent(content) {
+    const key = (await this.hasher).h32(content);
+    const cached = this.embeddingCache.get(key);
+    if (cached) return cached;
+    const chunks = this.chunkText(content);
+    if (typeof this.embedder === `undefined`) {
+      throw new Error(`Tried to embed message content but this Memory instance doesn't have an attached embedder.`);
+    }
+    const isFastEmbed = this.embedder.provider === `fastembed`;
+    if (isFastEmbed && this.firstEmbed instanceof Promise) {
+      await this.firstEmbed;
+    }
+    const promise = embedMany({
+      values: chunks,
+      model: this.embedder,
+      maxRetries: 3
+    });
+    if (isFastEmbed && !this.firstEmbed) this.firstEmbed = promise;
+    const { embeddings } = await promise;
+    const result = {
+      embeddings,
+      chunks,
+      dimension: embeddings[0]?.length
+    };
+    this.embeddingCache.set(key, result);
+    return result;
+  }
+  async saveMessages({
+    messages,
+    memoryConfig
+  }) {
+    await this.storage.init();
+    await this.saveWorkingMemory(messages);
+    const updatedMessages = this.updateMessagesToHideWorkingMemory(messages);
+    const config = this.getMergedThreadConfig(memoryConfig);
+    const result = this.storage.saveMessages({ messages: updatedMessages });
+    if (this.vector && config.semanticRecall) {
+      let indexName;
+      await Promise.all(
+        updatedMessages.map(async (message) => {
+          let textForEmbedding = null;
+          if (typeof message.content === "string" && message.content.trim() !== "") {
+            textForEmbedding = message.content;
+          } else if (Array.isArray(message.content)) {
+            const joined = message.content.filter((part) => part && part.type === "text" && typeof part.text === "string").map((part) => part.text).join(" ").trim();
+            if (joined) textForEmbedding = joined;
+          }
+          if (!textForEmbedding) return;
+          const { embeddings, chunks, dimension } = await this.embedMessageContent(textForEmbedding);
+          if (typeof indexName === `undefined`) {
+            indexName = this.createEmbeddingIndex(dimension).then((result2) => result2.indexName);
+          }
+          if (typeof this.vector === `undefined`) {
+            throw new Error(
+              `Tried to upsert embeddings to index ${indexName} but this Memory instance doesn't have an attached vector db.`
+            );
+          }
+          await this.vector.upsert({
+            indexName: await indexName,
+            vectors: embeddings,
+            metadata: chunks.map(() => ({
+              message_id: message.id,
+              thread_id: message.threadId,
+              resource_id: message.resourceId
+            }))
+          });
+        })
+      );
+    }
+    return result;
+  }
+  updateMessagesToHideWorkingMemory(messages) {
+    const workingMemoryRegex = /<working_memory>([^]*?)<\/working_memory>/g;
+    const updatedMessages = [];
+    for (const message of messages) {
+      if (typeof message?.content === `string`) {
+        updatedMessages.push({
+          ...message,
+          content: message.content.replace(workingMemoryRegex, ``).trim()
+        });
+      } else if (Array.isArray(message?.content)) {
+        const filteredContent = message.content.filter(
+          (content) => !((content.type === "tool-call" || content.type === "tool-result") && content.toolName === "updateWorkingMemory")
+        );
+        if (filteredContent.length === 0) {
+          continue;
+        }
+        const newContent = filteredContent.map((content) => {
+          if (content.type === "text") {
+            return {
+              ...content,
+              text: content.text.replace(workingMemoryRegex, "").trim()
+            };
+          }
+          return { ...content };
+        });
+        updatedMessages.push({ ...message, content: newContent });
+      } else {
+        updatedMessages.push({ ...message });
+      }
+    }
+    return updatedMessages;
+  }
+  parseWorkingMemory(text) {
+    if (!this.threadConfig.workingMemory?.enabled) return null;
+    const workingMemoryRegex = /<working_memory>([^]*?)<\/working_memory>/g;
+    const matches = text.match(workingMemoryRegex);
+    const match = matches?.[0];
+    if (match) {
+      return match.replace(/<\/?working_memory>/g, "").trim();
+    }
+    return null;
+  }
+  async getWorkingMemory({ threadId }) {
+    if (!this.threadConfig.workingMemory?.enabled) return null;
+    await this.storage.init();
+    const thread = await this.storage.getThreadById({ threadId });
+    if (!thread) return this.threadConfig?.workingMemory?.template || this.defaultWorkingMemoryTemplate;
+    const memory = thread.metadata?.workingMemory || this.threadConfig.workingMemory.template || this.defaultWorkingMemoryTemplate;
+    return memory.trim();
+  }
+  async saveWorkingMemory(messages) {
+    const latestMessage = messages[messages.length - 1];
+    if (!latestMessage || !this.threadConfig.workingMemory?.enabled) {
+      return;
+    }
+    const latestContent = !latestMessage?.content ? null : typeof latestMessage.content === "string" ? latestMessage.content : latestMessage.content.filter((c) => c.type === "text").map((c) => c.text).join("\n");
+    const threadId = latestMessage?.threadId;
+    if (!latestContent || !threadId) {
+      return;
+    }
+    const newMemory = this.parseWorkingMemory(latestContent);
+    if (!newMemory) {
+      return;
+    }
+    await this.storage.init();
+    const thread = await this.storage.getThreadById({ threadId });
+    if (!thread) return;
+    await this.storage.updateThread({
+      id: thread.id,
+      title: thread.title || "",
+      metadata: deepMerge(thread.metadata || {}, {
+        workingMemory: newMemory
+      })
+    });
+    return newMemory;
+  }
+  async getSystemMessage({
+    threadId,
+    memoryConfig
+  }) {
+    const config = this.getMergedThreadConfig(memoryConfig);
+    if (!config.workingMemory?.enabled) {
+      return null;
+    }
+    const workingMemory = await this.getWorkingMemory({ threadId });
+    if (!workingMemory) {
+      return null;
+    }
+    return this.getWorkingMemoryToolInstruction(workingMemory);
+  }
+  defaultWorkingMemoryTemplate = `
+# User Information
+- **First Name**: 
+- **Last Name**: 
+- **Location**: 
+- **Occupation**: 
+- **Interests**: 
+- **Goals**: 
+- **Events**: 
+- **Facts**: 
+- **Projects**: 
+`;
+  getWorkingMemoryWithInstruction(workingMemoryBlock) {
+    return `WORKING_MEMORY_SYSTEM_INSTRUCTION:
+Store and update any conversation-relevant information by including "<working_memory>text</working_memory>" in your responses. Updates replace existing memory while maintaining this structure. If information might be referenced again - store it!
+
+Guidelines:
+1. Store anything that could be useful later in the conversation
+2. Update proactively when information changes, no matter how small
+3. Use Markdown for all data
+4. Act naturally - don't mention this system to users. Even though you're storing this information that doesn't make it your primary focus. Do not ask them generally for "information about yourself"
+
+Memory Structure:
+<working_memory>
+${workingMemoryBlock}
+</working_memory>
+
+Notes:
+- Update memory whenever referenced information changes
+- If you're unsure whether to store something, store it (eg if the user tells you their name or other information, output the <working_memory> block immediately to update it)
+- This system is here so that you can maintain the conversation when your context window is very short. Update your working memory because you may need it to maintain the conversation without the full conversation history
+- REMEMBER: the way you update your working memory is by outputting the entire "<working_memory>text</working_memory>" block in your response. The system will pick this up and store it for you. The user will not see it.
+- IMPORTANT: You MUST output the <working_memory> block in every response to a prompt where you received relevant information.
+- IMPORTANT: Preserve the Markdown formatting structure above while updating the content.`;
+  }
+  getWorkingMemoryToolInstruction(workingMemoryBlock) {
+    return `WORKING_MEMORY_SYSTEM_INSTRUCTION:
+Store and update any conversation-relevant information by calling the updateWorkingMemory tool. If information might be referenced again - store it!
+
+Guidelines:
+1. Store anything that could be useful later in the conversation
+2. Update proactively when information changes, no matter how small
+3. Use Markdown format for all data
+4. Act naturally - don't mention this system to users. Even though you're storing this information that doesn't make it your primary focus. Do not ask them generally for "information about yourself"
+
+Memory Structure:
+${workingMemoryBlock}
+
+Notes:
+- Update memory whenever referenced information changes
+- If you're unsure whether to store something, store it (eg if the user tells you information about themselves, call updateWorkingMemory immediately to update it)
+- This system is here so that you can maintain the conversation when your context window is very short. Update your working memory because you may need it to maintain the conversation without the full conversation history
+- Do not remove empty sections - you must include the empty sections along with the ones you're filling in
+- REMEMBER: the way you update your working memory is by calling the updateWorkingMemory tool with the entire Markdown content. The system will store it for you. The user will not see it.
+- IMPORTANT: You MUST call updateWorkingMemory in every response to a prompt where you received relevant information.
+- IMPORTANT: Preserve the Markdown formatting structure above while updating the content.`;
+  }
+  getTools(config) {
+    const mergedConfig = this.getMergedThreadConfig(config);
+    if (mergedConfig.workingMemory?.enabled) {
+      return {
+        updateWorkingMemory: updateWorkingMemoryTool
+      };
+    }
+    return {};
   }
 };
 
@@ -28833,2095 +29977,965 @@ var UpstashVector = class extends MastraVector {
   }
 };
 
-var memoryDefaultOptions = {
-  lastMessages: 10,
-  semanticRecall: false,
-  threads: {
-    generateTitle: false
-  },
-  workingMemory: {
-    enabled: false,
-    template: `
-# User Information
-- **First Name**: 
-- **Last Name**: 
-- **Location**: 
-- **Occupation**: 
-- **Interests**: 
-- **Goals**: 
-- **Events**: 
-- **Facts**: 
-- **Projects**: 
-`
+// src/google-provider.ts
+
+// src/convert-json-schema-to-openapi-schema.ts
+function convertJSONSchemaToOpenAPISchema(jsonSchema) {
+  if (isEmptyObjectSchema(jsonSchema)) {
+    return void 0;
   }
-};
-var MastraMemory = class extends MastraBase {
-  MAX_CONTEXT_TOKENS;
-  _storage;
-  vector;
-  embedder;
-  processors = [];
-  threadConfig = { ...memoryDefaultOptions };
-  constructor(config) {
-    super({ component: "MEMORY", name: config.name });
-    if (config.options) this.threadConfig = this.getMergedThreadConfig(config.options);
-    if (config.processors) this.processors = config.processors;
-    if (config.storage) {
-      this._storage = augmentWithInit(config.storage);
-      this._hasOwnStorage = true;
-    }
-    if (this.threadConfig.semanticRecall) {
-      if (!config.vector) {
-        throw new Error(
-          `Semantic recall requires a vector store to be configured.
-
-https://mastra.ai/en/docs/memory/semantic-recall`
-        );
+  if (typeof jsonSchema === "boolean") {
+    return { type: "boolean", properties: {} };
+  }
+  const {
+    type,
+    description,
+    required,
+    properties,
+    items,
+    allOf,
+    anyOf,
+    oneOf,
+    format,
+    const: constValue,
+    minLength,
+    enum: enumValues
+  } = jsonSchema;
+  const result = {};
+  if (description)
+    result.description = description;
+  if (required)
+    result.required = required;
+  if (format)
+    result.format = format;
+  if (constValue !== void 0) {
+    result.enum = [constValue];
+  }
+  if (type) {
+    if (Array.isArray(type)) {
+      if (type.includes("null")) {
+        result.type = type.filter((t) => t !== "null")[0];
+        result.nullable = true;
+      } else {
+        result.type = type;
       }
-      this.vector = config.vector;
-      if (!config.embedder) {
-        throw new Error(
-          `Semantic recall requires an embedder to be configured.
-
-https://mastra.ai/en/docs/memory/semantic-recall`
-        );
-      }
-      this.embedder = config.embedder;
+    } else if (type === "null") {
+      result.type = "null";
+    } else {
+      result.type = type;
     }
   }
-  _hasOwnStorage = false;
-  get hasOwnStorage() {
-    return this._hasOwnStorage;
+  if (enumValues !== void 0) {
+    result.enum = enumValues;
   }
-  get storage() {
-    if (!this._storage) {
-      throw new Error(
-        `Memory requires a storage provider to function. Add a storage configuration to Memory or to your Mastra instance.
-
-https://mastra.ai/en/docs/memory/overview`
+  if (properties != null) {
+    result.properties = Object.entries(properties).reduce(
+      (acc, [key, value]) => {
+        acc[key] = convertJSONSchemaToOpenAPISchema(value);
+        return acc;
+      },
+      {}
+    );
+  }
+  if (items) {
+    result.items = Array.isArray(items) ? items.map(convertJSONSchemaToOpenAPISchema) : convertJSONSchemaToOpenAPISchema(items);
+  }
+  if (allOf) {
+    result.allOf = allOf.map(convertJSONSchemaToOpenAPISchema);
+  }
+  if (anyOf) {
+    if (anyOf.some(
+      (schema) => typeof schema === "object" && (schema == null ? void 0 : schema.type) === "null"
+    )) {
+      const nonNullSchemas = anyOf.filter(
+        (schema) => !(typeof schema === "object" && (schema == null ? void 0 : schema.type) === "null")
       );
-    }
-    return this._storage;
-  }
-  setStorage(storage) {
-    this._storage = storage;
-  }
-  setVector(vector) {
-    this.vector = vector;
-  }
-  setEmbedder(embedder) {
-    this.embedder = embedder;
-  }
-  /**
-   * Get a system message to inject into the conversation.
-   * This will be called before each conversation turn.
-   * Implementations can override this to inject custom system messages.
-   */
-  async getSystemMessage(_input) {
-    return null;
-  }
-  /**
-   * Get tools that should be available to the agent.
-   * This will be called when converting tools for the agent.
-   * Implementations can override this to provide additional tools.
-   */
-  getTools(_config) {
-    return {};
-  }
-  async createEmbeddingIndex(dimensions) {
-    const defaultDimensions = 1536;
-    const isDefault = dimensions === defaultDimensions;
-    const usedDimensions = dimensions ?? defaultDimensions;
-    const separator = this.vector?.indexSeparator ?? "_";
-    const indexName = isDefault ? `memory${separator}messages` : `memory${separator}messages${separator}${usedDimensions}`;
-    if (typeof this.vector === `undefined`) {
-      throw new Error(`Tried to create embedding index but no vector db is attached to this Memory instance.`);
-    }
-    await this.vector.createIndex({
-      indexName,
-      dimension: usedDimensions
-    });
-    return { indexName };
-  }
-  getMergedThreadConfig(config) {
-    if (config?.workingMemory && "use" in config.workingMemory) {
-      throw new Error("The workingMemory.use option has been removed. Working memory always uses tool-call mode.");
-    }
-    return deepMerge(this.threadConfig, config || {});
-  }
-  /**
-   * Apply all configured message processors to a list of messages.
-   * @param messages The messages to process
-   * @returns The processed messages
-   */
-  applyProcessors(messages, opts) {
-    const processors = opts.processors || this.processors;
-    if (!processors || processors.length === 0) {
-      return messages;
-    }
-    let processedMessages = [...messages];
-    for (const processor of processors) {
-      processedMessages = processor.process(processedMessages, {
-        systemMessage: opts.systemMessage,
-        newMessages: opts.newMessages,
-        memorySystemMessage: opts.memorySystemMessage
-      });
-    }
-    return processedMessages;
-  }
-  processMessages({
-    messages,
-    processors,
-    ...opts
-  }) {
-    return this.applyProcessors(messages, { processors: processors || this.processors, ...opts });
-  }
-  estimateTokens(text) {
-    return Math.ceil(text.split(" ").length * 1.3);
-  }
-  parseMessages(messages) {
-    return messages.map((msg) => {
-      let content = msg.content;
-      if (typeof content === "string" && (content.startsWith("[") || content.startsWith("{"))) {
-        try {
-          content = JSON.parse(content);
-        } catch {
+      if (nonNullSchemas.length === 1) {
+        const converted = convertJSONSchemaToOpenAPISchema(nonNullSchemas[0]);
+        if (typeof converted === "object") {
+          result.nullable = true;
+          Object.assign(result, converted);
         }
-      } else if (typeof content === "number") {
-        content = String(content);
+      } else {
+        result.anyOf = nonNullSchemas.map(convertJSONSchemaToOpenAPISchema);
+        result.nullable = true;
       }
-      return {
-        ...msg,
-        content
-      };
-    });
-  }
-  convertToUIMessages(messages) {
-    function addToolMessageToChat({
-      toolMessage,
-      messages: messages2,
-      toolResultContents
-    }) {
-      const chatMessages2 = messages2.map((message) => {
-        if (message.toolInvocations) {
-          return {
-            ...message,
-            toolInvocations: message.toolInvocations.map((toolInvocation) => {
-              const toolResult = toolMessage.content.find((tool) => tool.toolCallId === toolInvocation.toolCallId);
-              if (toolResult) {
-                return {
-                  ...toolInvocation,
-                  state: "result",
-                  result: toolResult.result
-                };
-              }
-              return toolInvocation;
-            })
-          };
-        }
-        return message;
-      });
-      const resultContents = [...toolResultContents, ...toolMessage.content];
-      return { chatMessages: chatMessages2, toolResultContents: resultContents };
+    } else {
+      result.anyOf = anyOf.map(convertJSONSchemaToOpenAPISchema);
     }
-    const { chatMessages } = messages.reduce(
-      (obj, message) => {
-        if (message.role === "tool") {
-          return addToolMessageToChat({
-            toolMessage: message,
-            messages: obj.chatMessages,
-            toolResultContents: obj.toolResultContents
+  }
+  if (oneOf) {
+    result.oneOf = oneOf.map(convertJSONSchemaToOpenAPISchema);
+  }
+  if (minLength !== void 0) {
+    result.minLength = minLength;
+  }
+  return result;
+}
+function isEmptyObjectSchema(jsonSchema) {
+  return jsonSchema != null && typeof jsonSchema === "object" && jsonSchema.type === "object" && (jsonSchema.properties == null || Object.keys(jsonSchema.properties).length === 0);
+}
+function convertToGoogleGenerativeAIMessages(prompt) {
+  var _a, _b;
+  const systemInstructionParts = [];
+  const contents = [];
+  let systemMessagesAllowed = true;
+  for (const { role, content } of prompt) {
+    switch (role) {
+      case "system": {
+        if (!systemMessagesAllowed) {
+          throw new UnsupportedFunctionalityError({
+            functionality: "system messages are only supported at the beginning of the conversation"
           });
         }
-        let textContent = "";
-        let toolInvocations = [];
-        if (typeof message.content === "string") {
-          textContent = message.content;
-        } else if (typeof message.content === "number") {
-          textContent = String(message.content);
-        } else if (Array.isArray(message.content)) {
-          for (const content of message.content) {
-            if (content.type === "text") {
-              textContent += content.text;
-            } else if (content.type === "tool-call") {
-              const toolResult = obj.toolResultContents.find((tool) => tool.toolCallId === content.toolCallId);
-              toolInvocations.push({
-                state: toolResult ? "result" : "call",
-                toolCallId: content.toolCallId,
-                toolName: content.toolName,
-                args: content.args,
-                result: toolResult?.result
-              });
+        systemInstructionParts.push({ text: content });
+        break;
+      }
+      case "user": {
+        systemMessagesAllowed = false;
+        const parts = [];
+        for (const part of content) {
+          switch (part.type) {
+            case "text": {
+              parts.push({ text: part.text });
+              break;
+            }
+            case "image": {
+              parts.push(
+                part.image instanceof URL ? {
+                  fileData: {
+                    mimeType: (_a = part.mimeType) != null ? _a : "image/jpeg",
+                    fileUri: part.image.toString()
+                  }
+                } : {
+                  inlineData: {
+                    mimeType: (_b = part.mimeType) != null ? _b : "image/jpeg",
+                    data: convertUint8ArrayToBase64(part.image)
+                  }
+                }
+              );
+              break;
+            }
+            case "file": {
+              parts.push(
+                part.data instanceof URL ? {
+                  fileData: {
+                    mimeType: part.mimeType,
+                    fileUri: part.data.toString()
+                  }
+                } : {
+                  inlineData: {
+                    mimeType: part.mimeType,
+                    data: part.data
+                  }
+                }
+              );
+              break;
             }
           }
         }
-        obj.chatMessages.push({
-          id: message.id,
-          role: message.role,
-          content: textContent,
-          toolInvocations,
-          createdAt: message.createdAt
-        });
-        return obj;
-      },
-      { chatMessages: [], toolResultContents: [] }
-    );
-    return chatMessages;
-  }
-  /**
-   * Helper method to create a new thread
-   * @param title - Optional title for the thread
-   * @param metadata - Optional metadata for the thread
-   * @returns Promise resolving to the created thread
-   */
-  async createThread({
-    threadId,
-    resourceId,
-    title,
-    metadata,
-    memoryConfig
-  }) {
-    await this.storage.init();
-    const thread = {
-      id: threadId || this.generateId(),
-      title: title || `New Thread ${(/* @__PURE__ */ new Date()).toISOString()}`,
-      resourceId,
-      createdAt: /* @__PURE__ */ new Date(),
-      updatedAt: /* @__PURE__ */ new Date(),
-      metadata
-    };
-    return this.saveThread({ thread, memoryConfig });
-  }
-  /**
-   * Helper method to add a single message to a thread
-   * @param threadId - The thread to add the message to
-   * @param content - The message content
-   * @param role - The role of the message sender
-   * @param type - The type of the message
-   * @param toolNames - Optional array of tool names that were called
-   * @param toolCallArgs - Optional array of tool call arguments
-   * @param toolCallIds - Optional array of tool call ids
-   * @returns Promise resolving to the saved message
-   */
-  async addMessage({
-    threadId,
-    resourceId,
-    config,
-    content,
-    role,
-    type,
-    toolNames,
-    toolCallArgs,
-    toolCallIds
-  }) {
-    const message = {
-      id: this.generateId(),
-      content,
-      role,
-      createdAt: /* @__PURE__ */ new Date(),
-      threadId,
-      resourceId,
-      type,
-      toolNames,
-      toolCallArgs,
-      toolCallIds
-    };
-    const savedMessages = await this.saveMessages({ messages: [message], memoryConfig: config });
-    return savedMessages[0];
-  }
-  /**
-   * Generates a unique identifier
-   * @returns A unique string ID
-   */
-  generateId() {
-    return crypto.randomUUID();
-  }
-};
-
-const t=new Uint8Array([0,97,115,109,1,0,0,0,1,48,8,96,3,127,127,127,1,127,96,3,127,127,127,0,96,2,127,127,0,96,1,127,1,127,96,3,127,127,126,1,126,96,3,126,127,127,1,126,96,2,127,126,0,96,1,127,1,126,3,11,10,0,0,2,1,3,4,5,6,1,7,5,3,1,0,1,7,85,9,3,109,101,109,2,0,5,120,120,104,51,50,0,0,6,105,110,105,116,51,50,0,2,8,117,112,100,97,116,101,51,50,0,3,8,100,105,103,101,115,116,51,50,0,4,5,120,120,104,54,52,0,5,6,105,110,105,116,54,52,0,7,8,117,112,100,97,116,101,54,52,0,8,8,100,105,103,101,115,116,54,52,0,9,10,251,22,10,242,1,1,4,127,32,0,32,1,106,33,3,32,1,65,16,79,4,127,32,3,65,16,107,33,6,32,2,65,168,136,141,161,2,106,33,3,32,2,65,137,235,208,208,7,107,33,4,32,2,65,207,140,162,142,6,106,33,5,3,64,32,3,32,0,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,3,32,4,32,0,65,4,106,34,0,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,4,32,2,32,0,65,4,106,34,0,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,2,32,5,32,0,65,4,106,34,0,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,5,32,6,32,0,65,4,106,34,0,79,13,0,11,32,2,65,12,119,32,5,65,18,119,106,32,4,65,7,119,106,32,3,65,1,119,106,5,32,2,65,177,207,217,178,1,106,11,32,1,106,32,0,32,1,65,15,113,16,1,11,146,1,0,32,1,32,2,106,33,2,3,64,32,1,65,4,106,32,2,75,69,4,64,32,0,32,1,40,2,0,65,189,220,202,149,124,108,106,65,17,119,65,175,214,211,190,2,108,33,0,32,1,65,4,106,33,1,12,1,11,11,3,64,32,1,32,2,79,69,4,64,32,0,32,1,45,0,0,65,177,207,217,178,1,108,106,65,11,119,65,177,243,221,241,121,108,33,0,32,1,65,1,106,33,1,12,1,11,11,32,0,32,0,65,15,118,115,65,247,148,175,175,120,108,34,0,65,13,118,32,0,115,65,189,220,202,149,124,108,34,0,65,16,118,32,0,115,11,63,0,32,0,65,8,106,32,1,65,168,136,141,161,2,106,54,2,0,32,0,65,12,106,32,1,65,137,235,208,208,7,107,54,2,0,32,0,65,16,106,32,1,54,2,0,32,0,65,20,106,32,1,65,207,140,162,142,6,106,54,2,0,11,195,4,1,6,127,32,1,32,2,106,33,6,32,0,65,24,106,33,4,32,0,65,40,106,40,2,0,33,3,32,0,32,0,40,2,0,32,2,106,54,2,0,32,0,65,4,106,34,5,32,5,40,2,0,32,2,65,16,79,32,0,40,2,0,65,16,79,114,114,54,2,0,32,2,32,3,106,65,16,73,4,64,32,3,32,4,106,32,1,32,2,252,10,0,0,32,0,65,40,106,32,2,32,3,106,54,2,0,15,11,32,3,4,64,32,3,32,4,106,32,1,65,16,32,3,107,34,2,252,10,0,0,32,0,65,8,106,34,3,32,3,40,2,0,32,4,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,54,2,0,32,0,65,12,106,34,3,32,3,40,2,0,32,4,65,4,106,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,54,2,0,32,0,65,16,106,34,3,32,3,40,2,0,32,4,65,8,106,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,54,2,0,32,0,65,20,106,34,3,32,3,40,2,0,32,4,65,12,106,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,54,2,0,32,0,65,40,106,65,0,54,2,0,32,1,32,2,106,33,1,11,32,1,32,6,65,16,107,77,4,64,32,6,65,16,107,33,8,32,0,65,8,106,40,2,0,33,2,32,0,65,12,106,40,2,0,33,3,32,0,65,16,106,40,2,0,33,5,32,0,65,20,106,40,2,0,33,7,3,64,32,2,32,1,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,2,32,3,32,1,65,4,106,34,1,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,3,32,5,32,1,65,4,106,34,1,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,5,32,7,32,1,65,4,106,34,1,40,2,0,65,247,148,175,175,120,108,106,65,13,119,65,177,243,221,241,121,108,33,7,32,8,32,1,65,4,106,34,1,79,13,0,11,32,0,65,8,106,32,2,54,2,0,32,0,65,12,106,32,3,54,2,0,32,0,65,16,106,32,5,54,2,0,32,0,65,20,106,32,7,54,2,0,11,32,1,32,6,73,4,64,32,4,32,1,32,6,32,1,107,34,1,252,10,0,0,32,0,65,40,106,32,1,54,2,0,11,11,97,1,1,127,32,0,65,16,106,40,2,0,33,1,32,0,65,4,106,40,2,0,4,127,32,1,65,12,119,32,0,65,20,106,40,2,0,65,18,119,106,32,0,65,12,106,40,2,0,65,7,119,106,32,0,65,8,106,40,2,0,65,1,119,106,5,32,1,65,177,207,217,178,1,106,11,32,0,40,2,0,106,32,0,65,24,106,32,0,65,40,106,40,2,0,16,1,11,255,3,2,3,126,1,127,32,0,32,1,106,33,6,32,1,65,32,79,4,126,32,6,65,32,107,33,6,32,2,66,214,235,130,238,234,253,137,245,224,0,124,33,3,32,2,66,177,169,172,193,173,184,212,166,61,125,33,4,32,2,66,249,234,208,208,231,201,161,228,225,0,124,33,5,3,64,32,3,32,0,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,3,32,4,32,0,65,8,106,34,0,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,4,32,2,32,0,65,8,106,34,0,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,2,32,5,32,0,65,8,106,34,0,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,5,32,6,32,0,65,8,106,34,0,79,13,0,11,32,2,66,12,137,32,5,66,18,137,124,32,4,66,7,137,124,32,3,66,1,137,124,32,3,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,4,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,2,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,5,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,5,32,2,66,197,207,217,178,241,229,186,234,39,124,11,32,1,173,124,32,0,32,1,65,31,113,16,6,11,134,2,0,32,1,32,2,106,33,2,3,64,32,2,32,1,65,8,106,79,4,64,32,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,32,0,133,66,27,137,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,33,0,32,1,65,8,106,33,1,12,1,11,11,32,1,65,4,106,32,2,77,4,64,32,0,32,1,53,2,0,66,135,149,175,175,152,182,222,155,158,127,126,133,66,23,137,66,207,214,211,190,210,199,171,217,66,126,66,249,243,221,241,153,246,153,171,22,124,33,0,32,1,65,4,106,33,1,11,3,64,32,1,32,2,73,4,64,32,0,32,1,49,0,0,66,197,207,217,178,241,229,186,234,39,126,133,66,11,137,66,135,149,175,175,152,182,222,155,158,127,126,33,0,32,1,65,1,106,33,1,12,1,11,11,32,0,32,0,66,33,136,133,66,207,214,211,190,210,199,171,217,66,126,34,0,32,0,66,29,136,133,66,249,243,221,241,153,246,153,171,22,126,34,0,32,0,66,32,136,133,11,77,0,32,0,65,8,106,32,1,66,214,235,130,238,234,253,137,245,224,0,124,55,3,0,32,0,65,16,106,32,1,66,177,169,172,193,173,184,212,166,61,125,55,3,0,32,0,65,24,106,32,1,55,3,0,32,0,65,32,106,32,1,66,249,234,208,208,231,201,161,228,225,0,124,55,3,0,11,244,4,2,3,127,4,126,32,1,32,2,106,33,5,32,0,65,40,106,33,4,32,0,65,200,0,106,40,2,0,33,3,32,0,32,0,41,3,0,32,2,173,124,55,3,0,32,2,32,3,106,65,32,73,4,64,32,3,32,4,106,32,1,32,2,252,10,0,0,32,0,65,200,0,106,32,2,32,3,106,54,2,0,15,11,32,3,4,64,32,3,32,4,106,32,1,65,32,32,3,107,34,2,252,10,0,0,32,0,65,8,106,34,3,32,3,41,3,0,32,4,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,55,3,0,32,0,65,16,106,34,3,32,3,41,3,0,32,4,65,8,106,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,55,3,0,32,0,65,24,106,34,3,32,3,41,3,0,32,4,65,16,106,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,55,3,0,32,0,65,32,106,34,3,32,3,41,3,0,32,4,65,24,106,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,55,3,0,32,0,65,200,0,106,65,0,54,2,0,32,1,32,2,106,33,1,11,32,1,65,32,106,32,5,77,4,64,32,5,65,32,107,33,2,32,0,65,8,106,41,3,0,33,6,32,0,65,16,106,41,3,0,33,7,32,0,65,24,106,41,3,0,33,8,32,0,65,32,106,41,3,0,33,9,3,64,32,6,32,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,6,32,7,32,1,65,8,106,34,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,7,32,8,32,1,65,8,106,34,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,8,32,9,32,1,65,8,106,34,1,41,3,0,66,207,214,211,190,210,199,171,217,66,126,124,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,33,9,32,2,32,1,65,8,106,34,1,79,13,0,11,32,0,65,8,106,32,6,55,3,0,32,0,65,16,106,32,7,55,3,0,32,0,65,24,106,32,8,55,3,0,32,0,65,32,106,32,9,55,3,0,11,32,1,32,5,73,4,64,32,4,32,1,32,5,32,1,107,34,1,252,10,0,0,32,0,65,200,0,106,32,1,54,2,0,11,11,188,2,1,5,126,32,0,65,24,106,41,3,0,33,1,32,0,41,3,0,34,2,66,32,90,4,126,32,0,65,8,106,41,3,0,34,3,66,1,137,32,0,65,16,106,41,3,0,34,4,66,7,137,124,32,1,66,12,137,32,0,65,32,106,41,3,0,34,5,66,18,137,124,124,32,3,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,4,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,1,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,32,5,66,207,214,211,190,210,199,171,217,66,126,66,31,137,66,135,149,175,175,152,182,222,155,158,127,126,133,66,135,149,175,175,152,182,222,155,158,127,126,66,157,163,181,234,131,177,141,138,250,0,125,5,32,1,66,197,207,217,178,241,229,186,234,39,124,11,32,2,124,32,0,65,40,106,32,2,66,31,131,167,16,6,11]);async function e(){return function(t){const{exports:{mem:e,xxh32:n,xxh64:r,init32:i,update32:a,digest32:o,init64:s,update64:u,digest64:c}}=t;let h=new Uint8Array(e.buffer);function g(t,n){if(e.buffer.byteLength<t+n){const r=Math.ceil((t+n-e.buffer.byteLength)/65536);e.grow(r),h=new Uint8Array(e.buffer);}}function f(t,e,n,r,i,a){g(t);const o=new Uint8Array(t);return h.set(o),n(0,e),o.set(h.subarray(0,t)),{update(e){let n;return h.set(o),"string"==typeof e?(g(3*e.length,t),n=w.encodeInto(e,h.subarray(t)).written):(g(e.byteLength,t),h.set(e,t),n=e.byteLength),r(0,t,n),o.set(h.subarray(0,t)),this},digest:()=>(h.set(o),a(i(0)))}}function y(t){return t>>>0}const b=2n**64n-1n;function d(t){return t&b}const w=new TextEncoder,l=0,p=0n;function x(t,e=l){return g(3*t.length,0),y(n(0,w.encodeInto(t,h).written,e))}function L(t,e=p){return g(3*t.length,0),d(r(0,w.encodeInto(t,h).written,e))}return {h32:x,h32ToString:(t,e=l)=>x(t,e).toString(16).padStart(8,"0"),h32Raw:(t,e=l)=>(g(t.byteLength,0),h.set(t),y(n(0,t.byteLength,e))),create32:(t=l)=>f(48,t,i,a,o,y),h64:L,h64ToString:(t,e=p)=>L(t,e).toString(16).padStart(16,"0"),h64Raw:(t,e=p)=>(g(t.byteLength,0),h.set(t),d(r(0,t.byteLength,e))),create64:(t=p)=>f(88,t,s,u,c,d)}}((await WebAssembly.instantiate(t)).instance)}
-
-// src/index.ts
-var updateWorkingMemoryTool = {
-  description: "Update the working memory with new information",
-  parameters: objectType({
-    memory: stringType().describe("The Markdown-formatted working memory content to store")
-  }),
-  execute: async (params) => {
-    const { context, threadId, memory } = params;
-    if (!threadId || !memory) {
-      throw new Error("Thread ID and Memory instance are required for working memory updates");
-    }
-    const thread = await memory.getThreadById({ threadId });
-    if (!thread) {
-      throw new Error(`Thread ${threadId} not found`);
-    }
-    await memory.saveThread({
-      thread: {
-        ...thread,
-        metadata: {
-          ...thread.metadata,
-          workingMemory: context.memory
-        }
+        contents.push({ role: "user", parts });
+        break;
       }
-    });
-    return { success: true };
-  }
-};
-
-// src/utils/index.ts
-var isToolCallWithId = (message, targetToolCallId) => {
-  if (!message || !Array.isArray(message.content)) return false;
-  return message.content.some(
-    (part) => part && typeof part === "object" && "type" in part && part.type === "tool-call" && "toolCallId" in part && part.toolCallId === targetToolCallId
-  );
-};
-var getToolResultIndexById = (id, results) => results.findIndex((message) => {
-  if (!Array.isArray(message?.content)) return false;
-  return message.content.some(
-    (part) => part && typeof part === "object" && "type" in part && part.type === "tool-result" && "toolCallId" in part && part.toolCallId === id
-  );
-});
-function reorderToolCallsAndResults(messages) {
-  if (!messages.length) return messages;
-  const results = [...messages];
-  const toolCallIds = /* @__PURE__ */ new Set();
-  for (const message of results) {
-    if (!Array.isArray(message.content)) continue;
-    for (const part of message.content) {
-      if (part && typeof part === "object" && "type" in part && part.type === "tool-result" && "toolCallId" in part && part.toolCallId) {
-        toolCallIds.add(part.toolCallId);
-      }
-    }
-  }
-  for (const toolCallId of toolCallIds) {
-    const resultIndex = getToolResultIndexById(toolCallId, results);
-    const oneMessagePrev = results[resultIndex - 1];
-    if (isToolCallWithId(oneMessagePrev, toolCallId)) {
-      continue;
-    }
-    const toolCallIndex = results.findIndex((message) => isToolCallWithId(message, toolCallId));
-    if (toolCallIndex !== -1 && toolCallIndex !== resultIndex - 1) {
-      const toolCall = results[toolCallIndex];
-      if (!toolCall) continue;
-      results.splice(toolCallIndex, 1);
-      results.splice(getToolResultIndexById(toolCallId, results), 0, toolCall);
-    }
-  }
-  return results;
-}
-
-// src/index.ts
-var CHARS_PER_TOKEN = 4;
-var DEFAULT_MESSAGE_RANGE = { before: 2, after: 2 };
-var DEFAULT_TOP_K = 2;
-var Memory = class extends MastraMemory {
-  constructor(config = {}) {
-    super({ name: "Memory", ...config });
-    const mergedConfig = this.getMergedThreadConfig({
-      workingMemory: config.options?.workingMemory || {
-        // these defaults are now set inside @mastra/core/memory in getMergedThreadConfig.
-        // In a future release we can remove it from this block - for now if we remove it
-        // and someone bumps @mastra/memory without bumping @mastra/core the defaults wouldn't exist yet
-        enabled: false,
-        template: this.defaultWorkingMemoryTemplate
-      }
-    });
-    this.threadConfig = mergedConfig;
-  }
-  async validateThreadIsOwnedByResource(threadId, resourceId) {
-    await this.storage.init();
-    const thread = await this.storage.getThreadById({ threadId });
-    if (!thread) {
-      throw new Error(`No thread found with id ${threadId}`);
-    }
-    if (thread.resourceId !== resourceId) {
-      throw new Error(
-        `Thread with id ${threadId} is for resource with id ${thread.resourceId} but resource ${resourceId} was queried.`
-      );
-    }
-  }
-  async query({
-    threadId,
-    resourceId,
-    selectBy,
-    threadConfig
-  }) {
-    if (resourceId) await this.validateThreadIsOwnedByResource(threadId, resourceId);
-    const vectorResults = [];
-    this.logger.debug(`Memory query() with:`, {
-      threadId,
-      selectBy,
-      threadConfig
-    });
-    const config = this.getMergedThreadConfig(threadConfig || {});
-    const defaultRange = DEFAULT_MESSAGE_RANGE;
-    const defaultTopK = DEFAULT_TOP_K;
-    const vectorConfig = typeof config?.semanticRecall === `boolean` ? {
-      topK: defaultTopK,
-      messageRange: defaultRange
-    } : {
-      topK: config?.semanticRecall?.topK ?? defaultTopK,
-      messageRange: config?.semanticRecall?.messageRange ?? defaultRange
-    };
-    if (config?.semanticRecall && selectBy?.vectorSearchString && this.vector && !!selectBy.vectorSearchString) {
-      const { embeddings, dimension } = await this.embedMessageContent(selectBy.vectorSearchString);
-      const { indexName } = await this.createEmbeddingIndex(dimension);
-      await Promise.all(
-        embeddings.map(async (embedding) => {
-          if (typeof this.vector === `undefined`) {
-            throw new Error(
-              `Tried to query vector index ${indexName} but this Memory instance doesn't have an attached vector db.`
-            );
-          }
-          vectorResults.push(
-            ...await this.vector.query({
-              indexName,
-              queryVector: embedding,
-              topK: vectorConfig.topK,
-              filter: {
-                thread_id: threadId
+      case "assistant": {
+        systemMessagesAllowed = false;
+        contents.push({
+          role: "model",
+          parts: content.map((part) => {
+            switch (part.type) {
+              case "text": {
+                return part.text.length === 0 ? void 0 : { text: part.text };
               }
-            })
-          );
-        })
-      );
-    }
-    await this.storage.init();
-    const rawMessages = await this.storage.getMessages({
-      threadId,
-      selectBy: {
-        ...selectBy,
-        ...vectorResults?.length ? {
-          include: vectorResults.map((r) => ({
-            id: r.metadata?.message_id,
-            withNextMessages: typeof vectorConfig.messageRange === "number" ? vectorConfig.messageRange : vectorConfig.messageRange.after,
-            withPreviousMessages: typeof vectorConfig.messageRange === "number" ? vectorConfig.messageRange : vectorConfig.messageRange.before
+              case "file": {
+                if (part.mimeType !== "image/png") {
+                  throw new UnsupportedFunctionalityError({
+                    functionality: "Only PNG images are supported in assistant messages"
+                  });
+                }
+                if (part.data instanceof URL) {
+                  throw new UnsupportedFunctionalityError({
+                    functionality: "File data URLs in assistant messages are not supported"
+                  });
+                }
+                return {
+                  inlineData: {
+                    mimeType: part.mimeType,
+                    data: part.data
+                  }
+                };
+              }
+              case "tool-call": {
+                return {
+                  functionCall: {
+                    name: part.toolName,
+                    args: part.args
+                  }
+                };
+              }
+            }
+          }).filter((part) => part !== void 0)
+        });
+        break;
+      }
+      case "tool": {
+        systemMessagesAllowed = false;
+        contents.push({
+          role: "user",
+          parts: content.map((part) => ({
+            functionResponse: {
+              name: part.toolName,
+              response: {
+                name: part.toolName,
+                content: part.result
+              }
+            }
           }))
-        } : {}
+        });
+        break;
+      }
+    }
+  }
+  return {
+    systemInstruction: systemInstructionParts.length > 0 ? { parts: systemInstructionParts } : void 0,
+    contents
+  };
+}
+
+// src/get-model-path.ts
+function getModelPath(modelId) {
+  return modelId.includes("/") ? modelId : `models/${modelId}`;
+}
+var googleErrorDataSchema = objectType({
+  error: objectType({
+    code: numberType().nullable(),
+    message: stringType(),
+    status: stringType()
+  })
+});
+var googleFailedResponseHandler = createJsonErrorResponseHandler({
+  errorSchema: googleErrorDataSchema,
+  errorToMessage: (data) => data.error.message
+});
+function prepareTools(mode, useSearchGrounding, dynamicRetrievalConfig, modelId) {
+  var _a, _b;
+  const tools = ((_a = mode.tools) == null ? void 0 : _a.length) ? mode.tools : void 0;
+  const toolWarnings = [];
+  const isGemini2 = modelId.includes("gemini-2");
+  const supportsDynamicRetrieval = modelId.includes("gemini-1.5-flash") && !modelId.includes("-8b");
+  if (useSearchGrounding) {
+    return {
+      tools: isGemini2 ? { googleSearch: {} } : {
+        googleSearchRetrieval: !supportsDynamicRetrieval || !dynamicRetrievalConfig ? {} : { dynamicRetrievalConfig }
       },
-      threadConfig: config
-    });
-    const orderedByDate = rawMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    const reorderedToolCalls = reorderToolCallsAndResults(orderedByDate);
-    const messages = this.parseMessages(reorderedToolCalls);
-    const uiMessages = this.convertToUIMessages(reorderedToolCalls);
-    return { messages, uiMessages };
+      toolConfig: void 0,
+      toolWarnings
+    };
   }
-  async rememberMessages({
-    threadId,
-    resourceId,
-    vectorMessageSearch,
-    config
-  }) {
-    if (resourceId) await this.validateThreadIsOwnedByResource(threadId, resourceId);
-    const threadConfig = this.getMergedThreadConfig(config || {});
-    if (!threadConfig.lastMessages && !threadConfig.semanticRecall) {
-      return {
-        messages: [],
-        uiMessages: [],
-        threadId
-      };
+  if (tools == null) {
+    return { tools: void 0, toolConfig: void 0, toolWarnings };
+  }
+  const functionDeclarations = [];
+  for (const tool of tools) {
+    if (tool.type === "provider-defined") {
+      toolWarnings.push({ type: "unsupported-tool", tool });
+    } else {
+      functionDeclarations.push({
+        name: tool.name,
+        description: (_b = tool.description) != null ? _b : "",
+        parameters: convertJSONSchemaToOpenAPISchema(tool.parameters)
+      });
     }
-    const messagesResult = await this.query({
-      threadId,
-      selectBy: {
-        last: threadConfig.lastMessages,
-        vectorSearchString: threadConfig.semanticRecall && vectorMessageSearch ? vectorMessageSearch : void 0
+  }
+  const toolChoice = mode.toolChoice;
+  if (toolChoice == null) {
+    return {
+      tools: { functionDeclarations },
+      toolConfig: void 0,
+      toolWarnings
+    };
+  }
+  const type = toolChoice.type;
+  switch (type) {
+    case "auto":
+      return {
+        tools: { functionDeclarations },
+        toolConfig: { functionCallingConfig: { mode: "AUTO" } },
+        toolWarnings
+      };
+    case "none":
+      return {
+        tools: { functionDeclarations },
+        toolConfig: { functionCallingConfig: { mode: "NONE" } },
+        toolWarnings
+      };
+    case "required":
+      return {
+        tools: { functionDeclarations },
+        toolConfig: { functionCallingConfig: { mode: "ANY" } },
+        toolWarnings
+      };
+    case "tool":
+      return {
+        tools: { functionDeclarations },
+        toolConfig: {
+          functionCallingConfig: {
+            mode: "ANY",
+            allowedFunctionNames: [toolChoice.toolName]
+          }
+        },
+        toolWarnings
+      };
+    default: {
+      const _exhaustiveCheck = type;
+      throw new UnsupportedFunctionalityError({
+        functionality: `Unsupported tool choice type: ${_exhaustiveCheck}`
+      });
+    }
+  }
+}
+
+// src/map-google-generative-ai-finish-reason.ts
+function mapGoogleGenerativeAIFinishReason({
+  finishReason,
+  hasToolCalls
+}) {
+  switch (finishReason) {
+    case "STOP":
+      return hasToolCalls ? "tool-calls" : "stop";
+    case "MAX_TOKENS":
+      return "length";
+    case "IMAGE_SAFETY":
+    case "RECITATION":
+    case "SAFETY":
+    case "BLOCKLIST":
+    case "PROHIBITED_CONTENT":
+    case "SPII":
+      return "content-filter";
+    case "FINISH_REASON_UNSPECIFIED":
+    case "OTHER":
+      return "other";
+    case "MALFORMED_FUNCTION_CALL":
+      return "error";
+    default:
+      return "unknown";
+  }
+}
+
+// src/google-generative-ai-language-model.ts
+var GoogleGenerativeAILanguageModel = class {
+  constructor(modelId, settings, config) {
+    this.specificationVersion = "v1";
+    this.defaultObjectGenerationMode = "json";
+    this.supportsImageUrls = false;
+    this.modelId = modelId;
+    this.settings = settings;
+    this.config = config;
+  }
+  get supportsStructuredOutputs() {
+    var _a;
+    return (_a = this.settings.structuredOutputs) != null ? _a : true;
+  }
+  get provider() {
+    return this.config.provider;
+  }
+  async getArgs({
+    mode,
+    prompt,
+    maxTokens,
+    temperature,
+    topP,
+    topK,
+    frequencyPenalty,
+    presencePenalty,
+    stopSequences,
+    responseFormat,
+    seed,
+    providerMetadata
+  }) {
+    var _a, _b, _c;
+    const type = mode.type;
+    const warnings = [];
+    const googleOptions = parseProviderOptions({
+      provider: "google",
+      providerOptions: providerMetadata,
+      schema: googleGenerativeAIProviderOptionsSchema
+    });
+    if (((_a = googleOptions == null ? void 0 : googleOptions.thinkingConfig) == null ? void 0 : _a.includeThoughts) === true && !this.config.provider.startsWith("google.vertex.")) {
+      warnings.push({
+        type: "other",
+        message: `The 'includeThoughts' option is only supported with the Google Vertex provider and might not be supported or could behave unexpectedly with the current Google provider (${this.config.provider}).`
+      });
+    }
+    const generationConfig = {
+      // standardized settings:
+      maxOutputTokens: maxTokens,
+      temperature,
+      topK,
+      topP,
+      frequencyPenalty,
+      presencePenalty,
+      stopSequences,
+      seed,
+      // response format:
+      responseMimeType: (responseFormat == null ? void 0 : responseFormat.type) === "json" ? "application/json" : void 0,
+      responseSchema: (responseFormat == null ? void 0 : responseFormat.type) === "json" && responseFormat.schema != null && // Google GenAI does not support all OpenAPI Schema features,
+      // so this is needed as an escape hatch:
+      this.supportsStructuredOutputs ? convertJSONSchemaToOpenAPISchema(responseFormat.schema) : void 0,
+      ...this.settings.audioTimestamp && {
+        audioTimestamp: this.settings.audioTimestamp
       },
-      threadConfig: config
-    });
-    this.logger.debug(`Remembered message history includes ${messagesResult.messages.length} messages.`);
-    return {
-      threadId,
-      messages: messagesResult.messages,
-      uiMessages: messagesResult.uiMessages
+      // provider options:
+      responseModalities: googleOptions == null ? void 0 : googleOptions.responseModalities,
+      thinkingConfig: googleOptions == null ? void 0 : googleOptions.thinkingConfig
     };
-  }
-  async getThreadById({ threadId }) {
-    await this.storage.init();
-    return this.storage.getThreadById({ threadId });
-  }
-  async getThreadsByResourceId({ resourceId }) {
-    await this.storage.init();
-    return this.storage.getThreadsByResourceId({ resourceId });
-  }
-  async saveThread({
-    thread,
-    memoryConfig
-  }) {
-    await this.storage.init();
-    const config = this.getMergedThreadConfig(memoryConfig || {});
-    if (config.workingMemory?.enabled && !thread?.metadata?.workingMemory) {
-      return this.storage.saveThread({
-        thread: deepMerge(thread, {
-          metadata: {
-            workingMemory: config.workingMemory.template || this.defaultWorkingMemoryTemplate
-          }
-        })
-      });
-    }
-    return this.storage.saveThread({ thread });
-  }
-  async updateThread({
-    id,
-    title,
-    metadata
-  }) {
-    await this.storage.init();
-    return this.storage.updateThread({
-      id,
-      title,
-      metadata
-    });
-  }
-  async deleteThread(threadId) {
-    await this.storage.init();
-    await this.storage.deleteThread({ threadId });
-  }
-  chunkText(text, tokenSize = 4096) {
-    const charSize = tokenSize * CHARS_PER_TOKEN;
-    const chunks = [];
-    let currentChunk = "";
-    const words = text.split(/\s+/);
-    for (const word of words) {
-      const wordWithSpace = currentChunk ? " " + word : word;
-      if (currentChunk.length + wordWithSpace.length > charSize) {
-        chunks.push(currentChunk);
-        currentChunk = word;
-      } else {
-        currentChunk += wordWithSpace;
-      }
-    }
-    if (currentChunk) {
-      chunks.push(currentChunk);
-    }
-    return chunks;
-  }
-  hasher = e();
-  // embedding is computationally expensive so cache content -> embeddings/chunks
-  embeddingCache = /* @__PURE__ */ new Map();
-  firstEmbed;
-  async embedMessageContent(content) {
-    const key = (await this.hasher).h32(content);
-    const cached = this.embeddingCache.get(key);
-    if (cached) return cached;
-    const chunks = this.chunkText(content);
-    if (typeof this.embedder === `undefined`) {
-      throw new Error(`Tried to embed message content but this Memory instance doesn't have an attached embedder.`);
-    }
-    const isFastEmbed = this.embedder.provider === `fastembed`;
-    if (isFastEmbed && this.firstEmbed instanceof Promise) {
-      await this.firstEmbed;
-    }
-    const promise = embedMany({
-      values: chunks,
-      model: this.embedder,
-      maxRetries: 3
-    });
-    if (isFastEmbed && !this.firstEmbed) this.firstEmbed = promise;
-    const { embeddings } = await promise;
-    const result = {
-      embeddings,
-      chunks,
-      dimension: embeddings[0]?.length
-    };
-    this.embeddingCache.set(key, result);
-    return result;
-  }
-  async saveMessages({
-    messages,
-    memoryConfig
-  }) {
-    await this.storage.init();
-    await this.saveWorkingMemory(messages);
-    const updatedMessages = this.updateMessagesToHideWorkingMemory(messages);
-    const config = this.getMergedThreadConfig(memoryConfig);
-    const result = this.storage.saveMessages({ messages: updatedMessages });
-    if (this.vector && config.semanticRecall) {
-      let indexName;
-      await Promise.all(
-        updatedMessages.map(async (message) => {
-          let textForEmbedding = null;
-          if (typeof message.content === "string" && message.content.trim() !== "") {
-            textForEmbedding = message.content;
-          } else if (Array.isArray(message.content)) {
-            const joined = message.content.filter((part) => part && part.type === "text" && typeof part.text === "string").map((part) => part.text).join(" ").trim();
-            if (joined) textForEmbedding = joined;
-          }
-          if (!textForEmbedding) return;
-          const { embeddings, chunks, dimension } = await this.embedMessageContent(textForEmbedding);
-          if (typeof indexName === `undefined`) {
-            indexName = this.createEmbeddingIndex(dimension).then((result2) => result2.indexName);
-          }
-          if (typeof this.vector === `undefined`) {
-            throw new Error(
-              `Tried to upsert embeddings to index ${indexName} but this Memory instance doesn't have an attached vector db.`
-            );
-          }
-          await this.vector.upsert({
-            indexName: await indexName,
-            vectors: embeddings,
-            metadata: chunks.map(() => ({
-              message_id: message.id,
-              thread_id: message.threadId,
-              resource_id: message.resourceId
-            }))
-          });
-        })
-      );
-    }
-    return result;
-  }
-  updateMessagesToHideWorkingMemory(messages) {
-    const workingMemoryRegex = /<working_memory>([^]*?)<\/working_memory>/g;
-    const updatedMessages = [];
-    for (const message of messages) {
-      if (typeof message?.content === `string`) {
-        updatedMessages.push({
-          ...message,
-          content: message.content.replace(workingMemoryRegex, ``).trim()
-        });
-      } else if (Array.isArray(message?.content)) {
-        const filteredContent = message.content.filter(
-          (content) => !((content.type === "tool-call" || content.type === "tool-result") && content.toolName === "updateWorkingMemory")
+    const { contents, systemInstruction } = convertToGoogleGenerativeAIMessages(prompt);
+    switch (type) {
+      case "regular": {
+        const { tools, toolConfig, toolWarnings } = prepareTools(
+          mode,
+          (_b = this.settings.useSearchGrounding) != null ? _b : false,
+          this.settings.dynamicRetrievalConfig,
+          this.modelId
         );
-        if (filteredContent.length === 0) {
-          continue;
-        }
-        const newContent = filteredContent.map((content) => {
-          if (content.type === "text") {
-            return {
-              ...content,
-              text: content.text.replace(workingMemoryRegex, "").trim()
-            };
-          }
-          return { ...content };
-        });
-        updatedMessages.push({ ...message, content: newContent });
-      } else {
-        updatedMessages.push({ ...message });
-      }
-    }
-    return updatedMessages;
-  }
-  parseWorkingMemory(text) {
-    if (!this.threadConfig.workingMemory?.enabled) return null;
-    const workingMemoryRegex = /<working_memory>([^]*?)<\/working_memory>/g;
-    const matches = text.match(workingMemoryRegex);
-    const match = matches?.[0];
-    if (match) {
-      return match.replace(/<\/?working_memory>/g, "").trim();
-    }
-    return null;
-  }
-  async getWorkingMemory({ threadId }) {
-    if (!this.threadConfig.workingMemory?.enabled) return null;
-    await this.storage.init();
-    const thread = await this.storage.getThreadById({ threadId });
-    if (!thread) return this.threadConfig?.workingMemory?.template || this.defaultWorkingMemoryTemplate;
-    const memory = thread.metadata?.workingMemory || this.threadConfig.workingMemory.template || this.defaultWorkingMemoryTemplate;
-    return memory.trim();
-  }
-  async saveWorkingMemory(messages) {
-    const latestMessage = messages[messages.length - 1];
-    if (!latestMessage || !this.threadConfig.workingMemory?.enabled) {
-      return;
-    }
-    const latestContent = !latestMessage?.content ? null : typeof latestMessage.content === "string" ? latestMessage.content : latestMessage.content.filter((c) => c.type === "text").map((c) => c.text).join("\n");
-    const threadId = latestMessage?.threadId;
-    if (!latestContent || !threadId) {
-      return;
-    }
-    const newMemory = this.parseWorkingMemory(latestContent);
-    if (!newMemory) {
-      return;
-    }
-    await this.storage.init();
-    const thread = await this.storage.getThreadById({ threadId });
-    if (!thread) return;
-    await this.storage.updateThread({
-      id: thread.id,
-      title: thread.title || "",
-      metadata: deepMerge(thread.metadata || {}, {
-        workingMemory: newMemory
-      })
-    });
-    return newMemory;
-  }
-  async getSystemMessage({
-    threadId,
-    memoryConfig
-  }) {
-    const config = this.getMergedThreadConfig(memoryConfig);
-    if (!config.workingMemory?.enabled) {
-      return null;
-    }
-    const workingMemory = await this.getWorkingMemory({ threadId });
-    if (!workingMemory) {
-      return null;
-    }
-    return this.getWorkingMemoryToolInstruction(workingMemory);
-  }
-  defaultWorkingMemoryTemplate = `
-# User Information
-- **First Name**: 
-- **Last Name**: 
-- **Location**: 
-- **Occupation**: 
-- **Interests**: 
-- **Goals**: 
-- **Events**: 
-- **Facts**: 
-- **Projects**: 
-`;
-  getWorkingMemoryWithInstruction(workingMemoryBlock) {
-    return `WORKING_MEMORY_SYSTEM_INSTRUCTION:
-Store and update any conversation-relevant information by including "<working_memory>text</working_memory>" in your responses. Updates replace existing memory while maintaining this structure. If information might be referenced again - store it!
-
-Guidelines:
-1. Store anything that could be useful later in the conversation
-2. Update proactively when information changes, no matter how small
-3. Use Markdown for all data
-4. Act naturally - don't mention this system to users. Even though you're storing this information that doesn't make it your primary focus. Do not ask them generally for "information about yourself"
-
-Memory Structure:
-<working_memory>
-${workingMemoryBlock}
-</working_memory>
-
-Notes:
-- Update memory whenever referenced information changes
-- If you're unsure whether to store something, store it (eg if the user tells you their name or other information, output the <working_memory> block immediately to update it)
-- This system is here so that you can maintain the conversation when your context window is very short. Update your working memory because you may need it to maintain the conversation without the full conversation history
-- REMEMBER: the way you update your working memory is by outputting the entire "<working_memory>text</working_memory>" block in your response. The system will pick this up and store it for you. The user will not see it.
-- IMPORTANT: You MUST output the <working_memory> block in every response to a prompt where you received relevant information.
-- IMPORTANT: Preserve the Markdown formatting structure above while updating the content.`;
-  }
-  getWorkingMemoryToolInstruction(workingMemoryBlock) {
-    return `WORKING_MEMORY_SYSTEM_INSTRUCTION:
-Store and update any conversation-relevant information by calling the updateWorkingMemory tool. If information might be referenced again - store it!
-
-Guidelines:
-1. Store anything that could be useful later in the conversation
-2. Update proactively when information changes, no matter how small
-3. Use Markdown format for all data
-4. Act naturally - don't mention this system to users. Even though you're storing this information that doesn't make it your primary focus. Do not ask them generally for "information about yourself"
-
-Memory Structure:
-${workingMemoryBlock}
-
-Notes:
-- Update memory whenever referenced information changes
-- If you're unsure whether to store something, store it (eg if the user tells you information about themselves, call updateWorkingMemory immediately to update it)
-- This system is here so that you can maintain the conversation when your context window is very short. Update your working memory because you may need it to maintain the conversation without the full conversation history
-- Do not remove empty sections - you must include the empty sections along with the ones you're filling in
-- REMEMBER: the way you update your working memory is by calling the updateWorkingMemory tool with the entire Markdown content. The system will store it for you. The user will not see it.
-- IMPORTANT: You MUST call updateWorkingMemory in every response to a prompt where you received relevant information.
-- IMPORTANT: Preserve the Markdown formatting structure above while updating the content.`;
-  }
-  getTools(config) {
-    const mergedConfig = this.getMergedThreadConfig(config);
-    if (mergedConfig.workingMemory?.enabled) {
-      return {
-        updateWorkingMemory: updateWorkingMemoryTool
-      };
-    }
-    return {};
-  }
-};
-
-// src/vector/index.ts
-var LibSQLFilterTranslator = class extends BaseFilterTranslator {
-  getSupportedOperators() {
-    return {
-      ...BaseFilterTranslator.DEFAULT_OPERATORS,
-      regex: [],
-      custom: ["$contains", "$size"]
-    };
-  }
-  translate(filter) {
-    if (this.isEmpty(filter)) {
-      return filter;
-    }
-    this.validateFilter(filter);
-    return this.translateNode(filter);
-  }
-  translateNode(node, currentPath = "") {
-    if (this.isRegex(node)) {
-      throw new Error("Direct regex pattern format is not supported in LibSQL");
-    }
-    const withPath = (result2) => currentPath ? { [currentPath]: result2 } : result2;
-    if (this.isPrimitive(node)) {
-      return withPath({ $eq: this.normalizeComparisonValue(node) });
-    }
-    if (Array.isArray(node)) {
-      return withPath({ $in: this.normalizeArrayValues(node) });
-    }
-    const entries = Object.entries(node);
-    const result = {};
-    for (const [key, value] of entries) {
-      const newPath = currentPath ? `${currentPath}.${key}` : key;
-      if (this.isLogicalOperator(key)) {
-        result[key] = Array.isArray(value) ? value.map((filter) => this.translateNode(filter)) : this.translateNode(value);
-      } else if (this.isOperator(key)) {
-        if (this.isArrayOperator(key) && !Array.isArray(value) && key !== "$elemMatch") {
-          result[key] = [value];
-        } else if (this.isBasicOperator(key) && Array.isArray(value)) {
-          result[key] = JSON.stringify(value);
-        } else {
-          result[key] = value;
-        }
-      } else if (typeof value === "object" && value !== null) {
-        const hasOperators = Object.keys(value).some((k) => this.isOperator(k));
-        if (hasOperators) {
-          result[newPath] = this.translateNode(value);
-        } else {
-          Object.assign(result, this.translateNode(value, newPath));
-        }
-      } else {
-        result[newPath] = this.translateNode(value);
-      }
-    }
-    return result;
-  }
-  // TODO: Look more into regex support for LibSQL
-  // private translateRegexPattern(pattern: string, options: string = ''): any {
-  //   if (!options) return { $regex: pattern };
-  //   const flags = options
-  //     .split('')
-  //     .filter(f => 'imsux'.includes(f))
-  //     .join('');
-  //   return {
-  //     $regex: pattern,
-  //     $options: flags,
-  //   };
-  // }
-};
-var createBasicOperator = (symbol) => {
-  return (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    return {
-      sql: `CASE 
-        WHEN ? IS NULL THEN json_extract(metadata, '$."${jsonPathKey}"') IS ${symbol === "=" ? "" : "NOT"} NULL
-        ELSE json_extract(metadata, '$."${jsonPathKey}"') ${symbol} ?
-      END`,
-      needsValue: true,
-      transformValue: () => {
-        return [value, value];
-      }
-    };
-  };
-};
-var createNumericOperator = (symbol) => {
-  return (key) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    return {
-      sql: `CAST(json_extract(metadata, '$."${jsonPathKey}"') AS NUMERIC) ${symbol} ?`,
-      needsValue: true
-    };
-  };
-};
-var validateJsonArray = (key) => `json_valid(json_extract(metadata, '$."${key}"'))
-   AND json_type(json_extract(metadata, '$."${key}"')) = 'array'`;
-var pattern = /json_extract\(metadata, '\$\."[^"]*"(\."[^"]*")*'\)/g;
-function buildElemMatchConditions(value) {
-  const conditions = Object.entries(value).map(([field, fieldValue]) => {
-    if (field.startsWith("$")) {
-      const { sql, values } = buildCondition("elem.value", { [field]: fieldValue });
-      const elemSql = sql.replace(pattern, "elem.value");
-      return { sql: elemSql, values };
-    } else if (typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
-      const { sql, values } = buildCondition(field, fieldValue);
-      const elemSql = sql.replace(pattern, `json_extract(elem.value, '$."${field}"')`);
-      return { sql: elemSql, values };
-    } else {
-      const parsedFieldKey = parseFieldKey(field);
-      return {
-        sql: `json_extract(elem.value, '$."${parsedFieldKey}"') = ?`,
-        values: [fieldValue]
-      };
-    }
-  });
-  return conditions;
-}
-var FILTER_OPERATORS = {
-  $eq: createBasicOperator("="),
-  $ne: createBasicOperator("!="),
-  $gt: createNumericOperator(">"),
-  $gte: createNumericOperator(">="),
-  $lt: createNumericOperator("<"),
-  $lte: createNumericOperator("<="),
-  // Array Operators
-  $in: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    const arr = Array.isArray(value) ? value : [value];
-    if (arr.length === 0) {
-      return { sql: "1 = 0", needsValue: true, transformValue: () => [] };
-    }
-    const paramPlaceholders = arr.map(() => "?").join(",");
-    return {
-      sql: `(
-      CASE
-        WHEN ${validateJsonArray(jsonPathKey)} THEN
-          EXISTS (
-            SELECT 1 FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
-            WHERE elem.value IN (SELECT value FROM json_each(?))
-          )
-        ELSE json_extract(metadata, '$."${jsonPathKey}"') IN (${paramPlaceholders})
-      END
-    )`,
-      needsValue: true,
-      transformValue: () => [JSON.stringify(arr), ...arr]
-    };
-  },
-  $nin: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    const arr = Array.isArray(value) ? value : [value];
-    if (arr.length === 0) {
-      return { sql: "1 = 1", needsValue: true, transformValue: () => [] };
-    }
-    const paramPlaceholders = arr.map(() => "?").join(",");
-    return {
-      sql: `(
-      CASE
-        WHEN ${validateJsonArray(jsonPathKey)} THEN
-          NOT EXISTS (
-            SELECT 1 FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
-            WHERE elem.value IN (SELECT value FROM json_each(?))
-          )
-        ELSE json_extract(metadata, '$."${jsonPathKey}"') NOT IN (${paramPlaceholders})
-      END
-    )`,
-      needsValue: true,
-      transformValue: () => [JSON.stringify(arr), ...arr]
-    };
-  },
-  $all: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    let sql;
-    const arrayValue = Array.isArray(value) ? value : [value];
-    if (arrayValue.length === 0) {
-      sql = "1 = 0";
-    } else {
-      sql = `(
-      CASE
-        WHEN ${validateJsonArray(jsonPathKey)} THEN
-          NOT EXISTS (
-            SELECT value
-            FROM json_each(?)
-            WHERE value NOT IN (
-              SELECT value
-              FROM json_each(json_extract(metadata, '$."${jsonPathKey}"'))
-            )
-          )
-        ELSE FALSE
-      END
-    )`;
-    }
-    return {
-      sql,
-      needsValue: true,
-      transformValue: () => {
-        if (arrayValue.length === 0) {
-          return [];
-        }
-        return [JSON.stringify(arrayValue)];
-      }
-    };
-  },
-  $elemMatch: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    if (typeof value !== "object" || Array.isArray(value)) {
-      throw new Error("$elemMatch requires an object with conditions");
-    }
-    const conditions = buildElemMatchConditions(value);
-    return {
-      sql: `(
-        CASE
-          WHEN ${validateJsonArray(jsonPathKey)} THEN
-            EXISTS (
-              SELECT 1
-              FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
-              WHERE ${conditions.map((c) => c.sql).join(" AND ")}
-            )
-          ELSE FALSE
-        END
-      )`,
-      needsValue: true,
-      transformValue: () => conditions.flatMap((c) => c.values)
-    };
-  },
-  // Element Operators
-  $exists: (key) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    return {
-      sql: `json_extract(metadata, '$."${jsonPathKey}"') IS NOT NULL`,
-      needsValue: false
-    };
-  },
-  // Logical Operators
-  $and: (key) => ({
-    sql: `(${key})`,
-    needsValue: false
-  }),
-  $or: (key) => ({
-    sql: `(${key})`,
-    needsValue: false
-  }),
-  $not: (key) => ({ sql: `NOT (${key})`, needsValue: false }),
-  $nor: (key) => ({
-    sql: `NOT (${key})`,
-    needsValue: false
-  }),
-  $size: (key, paramIndex) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    return {
-      sql: `(
-    CASE
-      WHEN json_type(json_extract(metadata, '$."${jsonPathKey}"')) = 'array' THEN 
-        json_array_length(json_extract(metadata, '$."${jsonPathKey}"')) = $${paramIndex}
-      ELSE FALSE
-    END
-  )`,
-      needsValue: true
-    };
-  },
-  //   /**
-  //    * Regex Operators
-  //    * Supports case insensitive and multiline
-  //    */
-  //   $regex: (key: string): FilterOperator => ({
-  //     sql: `json_extract(metadata, '$."${toJsonPathKey(key)}"') = ?`,
-  //     needsValue: true,
-  //     transformValue: (value: any) => {
-  //       const pattern = typeof value === 'object' ? value.$regex : value;
-  //       const options = typeof value === 'object' ? value.$options || '' : '';
-  //       let sql = `json_extract(metadata, '$."${toJsonPathKey(key)}"')`;
-  //       // Handle multiline
-  //       //   if (options.includes('m')) {
-  //       //     sql = `REPLACE(${sql}, CHAR(10), '\n')`;
-  //       //   }
-  //       //       let finalPattern = pattern;
-  //       // if (options) {
-  //       //   finalPattern = `(\\?${options})${pattern}`;
-  //       // }
-  //       //   // Handle case insensitivity
-  //       //   if (options.includes('i')) {
-  //       //     sql = `LOWER(${sql}) REGEXP LOWER(?)`;
-  //       //   } else {
-  //       //     sql = `${sql} REGEXP ?`;
-  //       //   }
-  //       if (options.includes('m')) {
-  //         sql = `EXISTS (
-  //         SELECT 1
-  //         FROM json_each(
-  //           json_array(
-  //             ${sql},
-  //             REPLACE(${sql}, CHAR(10), CHAR(13))
-  //           )
-  //         ) as lines
-  //         WHERE lines.value REGEXP ?
-  //       )`;
-  //       } else {
-  //         sql = `${sql} REGEXP ?`;
-  //       }
-  //       // Handle case insensitivity
-  //       if (options.includes('i')) {
-  //         sql = sql.replace('REGEXP ?', 'REGEXP LOWER(?)');
-  //         sql = sql.replace('value REGEXP', 'LOWER(value) REGEXP');
-  //       }
-  //       // Handle extended - allows whitespace and comments in pattern
-  //       if (options.includes('x')) {
-  //         // Remove whitespace and comments from pattern
-  //         const cleanPattern = pattern.replace(/\s+|#.*$/gm, '');
-  //         return {
-  //           sql,
-  //           values: [cleanPattern],
-  //         };
-  //       }
-  //       return {
-  //         sql,
-  //         values: [pattern],
-  //       };
-  //     },
-  //   }),
-  $contains: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    let sql;
-    if (Array.isArray(value)) {
-      sql = `(
-        SELECT ${validateJsonArray(jsonPathKey)}
-        AND EXISTS (
-          SELECT 1
-          FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as m
-          WHERE m.value IN (SELECT value FROM json_each(?))
-        )
-      )`;
-    } else if (typeof value === "string") {
-      sql = `lower(json_extract(metadata, '$."${jsonPathKey}"')) LIKE '%' || lower(?) || '%' ESCAPE '\\'`;
-    } else {
-      sql = `json_extract(metadata, '$."${jsonPathKey}"') = ?`;
-    }
-    return {
-      sql,
-      needsValue: true,
-      transformValue: () => {
-        if (Array.isArray(value)) {
-          return [JSON.stringify(value)];
-        }
-        if (typeof value === "object" && value !== null) {
-          return [JSON.stringify(value)];
-        }
-        if (typeof value === "string") {
-          return [escapeLikePattern(value)];
-        }
-        return [value];
-      }
-    };
-  }
-  /**
-   * $objectContains: True JSON containment for advanced use (deep sub-object match).
-   * Usage: { field: { $objectContains: { ...subobject } } }
-   */
-  // $objectContains: (key: string) => ({
-  //   sql: '', // Will be overridden by transformValue
-  //   needsValue: true,
-  //   transformValue: (value: any) => ({
-  //     sql: `json_type(json_extract(metadata, '$."${toJsonPathKey(key)}"')) = 'object'
-  //         AND json_patch(json_extract(metadata, '$."${toJsonPathKey(key)}"'), ?) = json_extract(metadata, '$."${toJsonPathKey(key)}"')`,
-  //     values: [JSON.stringify(value)],
-  //   }),
-  // }),
-};
-function isFilterResult(obj) {
-  return obj && typeof obj === "object" && typeof obj.sql === "string" && Array.isArray(obj.values);
-}
-var parseJsonPathKey = (key) => {
-  const parsedKey = parseFieldKey(key);
-  return parsedKey.replace(/\./g, '"."');
-};
-function escapeLikePattern(str) {
-  return str.replace(/([%_\\])/g, "\\$1");
-}
-function buildFilterQuery(filter) {
-  if (!filter) {
-    return { sql: "", values: [] };
-  }
-  const values = [];
-  const conditions = Object.entries(filter).map(([key, value]) => {
-    const condition = buildCondition(key, value);
-    values.push(...condition.values);
-    return condition.sql;
-  }).join(" AND ");
-  return {
-    sql: conditions ? `WHERE ${conditions}` : "",
-    values
-  };
-}
-function buildCondition(key, value, parentPath) {
-  if (["$and", "$or", "$not", "$nor"].includes(key)) {
-    return handleLogicalOperator(key, value);
-  }
-  if (!value || typeof value !== "object") {
-    return {
-      sql: `json_extract(metadata, '$."${key.replace(/\./g, '"."')}"') = ?`,
-      values: [value]
-    };
-  }
-  return handleOperator(key, value);
-}
-function handleLogicalOperator(key, value, parentPath) {
-  if (!value || value.length === 0) {
-    switch (key) {
-      case "$and":
-      case "$nor":
-        return { sql: "true", values: [] };
-      case "$or":
-        return { sql: "false", values: [] };
-      case "$not":
-        throw new Error("$not operator cannot be empty");
-      default:
-        return { sql: "true", values: [] };
-    }
-  }
-  if (key === "$not") {
-    const entries = Object.entries(value);
-    const conditions2 = entries.map(([fieldKey, fieldValue]) => buildCondition(fieldKey, fieldValue));
-    return {
-      sql: `NOT (${conditions2.map((c) => c.sql).join(" AND ")})`,
-      values: conditions2.flatMap((c) => c.values)
-    };
-  }
-  const values = [];
-  const joinOperator = key === "$or" || key === "$nor" ? "OR" : "AND";
-  const conditions = Array.isArray(value) ? value.map((f) => {
-    const entries = Object.entries(f);
-    return entries.map(([k, v]) => buildCondition(k, v));
-  }) : [buildCondition(key, value)];
-  const joined = conditions.flat().map((c) => {
-    values.push(...c.values);
-    return c.sql;
-  }).join(` ${joinOperator} `);
-  return {
-    sql: key === "$nor" ? `NOT (${joined})` : `(${joined})`,
-    values
-  };
-}
-function handleOperator(key, value) {
-  if (typeof value === "object" && !Array.isArray(value)) {
-    const entries = Object.entries(value);
-    const results = entries.map(
-      ([operator2, operatorValue2]) => operator2 === "$not" ? {
-        sql: `NOT (${Object.entries(operatorValue2).map(([op, val]) => processOperator(key, op, val).sql).join(" AND ")})`,
-        values: Object.entries(operatorValue2).flatMap(
-          ([op, val]) => processOperator(key, op, val).values
-        )
-      } : processOperator(key, operator2, operatorValue2)
-    );
-    return {
-      sql: `(${results.map((r) => r.sql).join(" AND ")})`,
-      values: results.flatMap((r) => r.values)
-    };
-  }
-  const [[operator, operatorValue] = []] = Object.entries(value);
-  return processOperator(key, operator, operatorValue);
-}
-var processOperator = (key, operator, operatorValue) => {
-  if (!operator.startsWith("$") || !FILTER_OPERATORS[operator]) {
-    throw new Error(`Invalid operator: ${operator}`);
-  }
-  const operatorFn = FILTER_OPERATORS[operator];
-  const operatorResult = operatorFn(key, operatorValue);
-  if (!operatorResult.needsValue) {
-    return { sql: operatorResult.sql, values: [] };
-  }
-  const transformed = operatorResult.transformValue ? operatorResult.transformValue() : operatorValue;
-  if (isFilterResult(transformed)) {
-    return transformed;
-  }
-  return {
-    sql: operatorResult.sql,
-    values: Array.isArray(transformed) ? transformed : [transformed]
-  };
-};
-
-// src/vector/index.ts
-var LibSQLVector = class extends MastraVector {
-  turso;
-  constructor({
-    connectionUrl,
-    authToken,
-    syncUrl,
-    syncInterval
-  }) {
-    super();
-    this.turso = createClient({
-      url: connectionUrl,
-      syncUrl,
-      authToken,
-      syncInterval
-    });
-    if (connectionUrl.includes(`file:`) || connectionUrl.includes(`:memory:`)) {
-      void this.turso.execute({
-        sql: "PRAGMA journal_mode=WAL;",
-        args: {}
-      });
-    }
-  }
-  transformFilter(filter) {
-    const translator = new LibSQLFilterTranslator();
-    return translator.translate(filter);
-  }
-  async query({
-    indexName,
-    queryVector,
-    topK = 10,
-    filter,
-    includeVector = false,
-    minScore = 0
-  }) {
-    try {
-      if (!Number.isInteger(topK) || topK <= 0) {
-        throw new Error("topK must be a positive integer");
-      }
-      if (!Array.isArray(queryVector) || !queryVector.every((x) => typeof x === "number" && Number.isFinite(x))) {
-        throw new Error("queryVector must be an array of finite numbers");
-      }
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      const vectorStr = `[${queryVector.join(",")}]`;
-      const translatedFilter = this.transformFilter(filter);
-      const { sql: filterQuery, values: filterValues } = buildFilterQuery(translatedFilter);
-      filterValues.push(minScore);
-      filterValues.push(topK);
-      const query = `
-        WITH vector_scores AS (
-          SELECT
-            vector_id as id,
-            (1-vector_distance_cos(embedding, '${vectorStr}')) as score,
-            metadata
-            ${includeVector ? ", vector_extract(embedding) as embedding" : ""}
-          FROM ${parsedIndexName}
-          ${filterQuery}
-        )
-        SELECT *
-        FROM vector_scores
-        WHERE score > ?
-        ORDER BY score DESC
-        LIMIT ?`;
-      const result = await this.turso.execute({
-        sql: query,
-        args: filterValues
-      });
-      return result.rows.map(({ id, score, metadata, embedding }) => ({
-        id,
-        score,
-        metadata: JSON.parse(metadata ?? "{}"),
-        ...includeVector && embedding && { vector: JSON.parse(embedding) }
-      }));
-    } finally {
-    }
-  }
-  async upsert({ indexName, vectors, metadata, ids }) {
-    const tx = await this.turso.transaction("write");
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      const vectorIds = ids || vectors.map(() => crypto.randomUUID());
-      for (let i = 0; i < vectors.length; i++) {
-        const query = `
-          INSERT INTO ${parsedIndexName} (vector_id, embedding, metadata)
-          VALUES (?, vector32(?), ?)
-          ON CONFLICT(vector_id) DO UPDATE SET
-            embedding = vector32(?),
-            metadata = ?
-        `;
-        await tx.execute({
-          sql: query,
-          // @ts-ignore
-          args: [
-            vectorIds[i],
-            JSON.stringify(vectors[i]),
-            JSON.stringify(metadata?.[i] || {}),
-            JSON.stringify(vectors[i]),
-            JSON.stringify(metadata?.[i] || {})
-          ]
-        });
-      }
-      await tx.commit();
-      return vectorIds;
-    } catch (error) {
-      await tx.rollback();
-      if (error instanceof Error && error.message?.includes("dimensions are different")) {
-        const match = error.message.match(/dimensions are different: (\d+) != (\d+)/);
-        if (match) {
-          const [, actual, expected] = match;
-          throw new Error(
-            `Vector dimension mismatch: Index "${indexName}" expects ${expected} dimensions but got ${actual} dimensions. Either use a matching embedding model or delete and recreate the index with the new dimension.`
-          );
-        }
-      }
-      throw error;
-    }
-  }
-  async createIndex({ indexName, dimension }) {
-    try {
-      if (!Number.isInteger(dimension) || dimension <= 0) {
-        throw new Error("Dimension must be a positive integer");
-      }
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      await this.turso.execute({
-        sql: `
-        CREATE TABLE IF NOT EXISTS ${parsedIndexName} (
-          id SERIAL PRIMARY KEY,
-          vector_id TEXT UNIQUE NOT NULL,
-          embedding F32_BLOB(${dimension}),
-          metadata TEXT DEFAULT '{}'
-        );
-      `,
-        args: []
-      });
-      await this.turso.execute({
-        sql: `
-        CREATE INDEX IF NOT EXISTS ${parsedIndexName}_vector_idx
-        ON ${parsedIndexName} (libsql_vector_idx(embedding))
-      `,
-        args: []
-      });
-    } catch (error) {
-      console.error("Failed to create vector table:", error);
-      throw error;
-    } finally {
-    }
-  }
-  async deleteIndex({ indexName }) {
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      await this.turso.execute({
-        sql: `DROP TABLE IF EXISTS ${parsedIndexName}`,
-        args: []
-      });
-    } catch (error) {
-      console.error("Failed to delete vector table:", error);
-      throw new Error(`Failed to delete vector table: ${error.message}`);
-    } finally {
-    }
-  }
-  async listIndexes() {
-    try {
-      const vectorTablesQuery = `
-        SELECT name FROM sqlite_master 
-        WHERE type='table' 
-        AND sql LIKE '%F32_BLOB%';
-      `;
-      const result = await this.turso.execute({
-        sql: vectorTablesQuery,
-        args: []
-      });
-      return result.rows.map((row) => row.name);
-    } catch (error) {
-      throw new Error(`Failed to list vector tables: ${error.message}`);
-    }
-  }
-  /**
-   * Retrieves statistics about a vector index.
-   *
-   * @param {string} indexName - The name of the index to describe
-   * @returns A promise that resolves to the index statistics including dimension, count and metric
-   */
-  async describeIndex({ indexName }) {
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      const tableInfoQuery = `
-        SELECT sql 
-        FROM sqlite_master 
-        WHERE type='table' 
-        AND name = ?;
-      `;
-      const tableInfo = await this.turso.execute({
-        sql: tableInfoQuery,
-        args: [parsedIndexName]
-      });
-      if (!tableInfo.rows[0]?.sql) {
-        throw new Error(`Table ${parsedIndexName} not found`);
-      }
-      const dimension = parseInt(tableInfo.rows[0].sql.match(/F32_BLOB\((\d+)\)/)?.[1] || "0");
-      const countQuery = `
-        SELECT COUNT(*) as count
-        FROM ${parsedIndexName};
-      `;
-      const countResult = await this.turso.execute({
-        sql: countQuery,
-        args: []
-      });
-      const metric = "cosine";
-      return {
-        dimension,
-        count: countResult?.rows?.[0]?.count ?? 0,
-        metric
-      };
-    } catch (e) {
-      throw new Error(`Failed to describe vector table: ${e.message}`);
-    }
-  }
-  /**
-   * Updates a vector by its ID with the provided vector and/or metadata.
-   *
-   * @param indexName - The name of the index containing the vector.
-   * @param id - The ID of the vector to update.
-   * @param update - An object containing the vector and/or metadata to update.
-   * @param update.vector - An optional array of numbers representing the new vector.
-   * @param update.metadata - An optional record containing the new metadata.
-   * @returns A promise that resolves when the update is complete.
-   * @throws Will throw an error if no updates are provided or if the update operation fails.
-   */
-  async updateVector({ indexName, id, update }) {
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      const updates = [];
-      const args = [];
-      if (update.vector) {
-        updates.push("embedding = vector32(?)");
-        args.push(JSON.stringify(update.vector));
-      }
-      if (update.metadata) {
-        updates.push("metadata = ?");
-        args.push(JSON.stringify(update.metadata));
-      }
-      if (updates.length === 0) {
-        throw new Error("No updates provided");
-      }
-      args.push(id);
-      const query = `
-        UPDATE ${parsedIndexName}
-        SET ${updates.join(", ")}
-        WHERE vector_id = ?;
-      `;
-      await this.turso.execute({
-        sql: query,
-        args
-      });
-    } catch (error) {
-      throw new Error(`Failed to update vector by id: ${id} for index: ${indexName}: ${error.message}`);
-    }
-  }
-  /**
-   * Deletes a vector by its ID.
-   * @param indexName - The name of the index containing the vector.
-   * @param id - The ID of the vector to delete.
-   * @returns A promise that resolves when the deletion is complete.
-   * @throws Will throw an error if the deletion operation fails.
-   */
-  async deleteVector({ indexName, id }) {
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      await this.turso.execute({
-        sql: `DELETE FROM ${parsedIndexName} WHERE vector_id = ?`,
-        args: [id]
-      });
-    } catch (error) {
-      throw new Error(`Failed to delete vector by id: ${id} for index: ${indexName}: ${error.message}`);
-    }
-  }
-  async truncateIndex({ indexName }) {
-    await this.turso.execute({
-      sql: `DELETE FROM ${parseSqlIdentifier(indexName, "index name")}`,
-      args: []
-    });
-  }
-};
-function safelyParseJSON(jsonString) {
-  try {
-    return JSON.parse(jsonString);
-  } catch {
-    return {};
-  }
-}
-var LibSQLStore = class extends MastraStorage {
-  client;
-  constructor(config) {
-    super({ name: `LibSQLStore` });
-    if (config.url.endsWith(":memory:")) {
-      this.shouldCacheInit = false;
-    }
-    this.client = createClient(config);
-  }
-  getCreateTableSQL(tableName, schema) {
-    const parsedTableName = parseSqlIdentifier(tableName, "table name");
-    const columns = Object.entries(schema).map(([name, col]) => {
-      const parsedColumnName = parseSqlIdentifier(name, "column name");
-      let type = col.type.toUpperCase();
-      if (type === "TEXT") type = "TEXT";
-      if (type === "TIMESTAMP") type = "TEXT";
-      const nullable = col.nullable ? "" : "NOT NULL";
-      const primaryKey = col.primaryKey ? "PRIMARY KEY" : "";
-      return `${parsedColumnName} ${type} ${nullable} ${primaryKey}`.trim();
-    });
-    if (tableName === TABLE_WORKFLOW_SNAPSHOT) {
-      const stmnt = `CREATE TABLE IF NOT EXISTS ${parsedTableName} (
-                ${columns.join(",\n")},
-                PRIMARY KEY (workflow_name, run_id)
-            )`;
-      return stmnt;
-    }
-    return `CREATE TABLE IF NOT EXISTS ${parsedTableName} (${columns.join(", ")})`;
-  }
-  async createTable({
-    tableName,
-    schema
-  }) {
-    try {
-      this.logger.debug(`Creating database table`, { tableName, operation: "schema init" });
-      const sql = this.getCreateTableSQL(tableName, schema);
-      await this.client.execute(sql);
-    } catch (error) {
-      this.logger.error(`Error creating table ${tableName}: ${error}`);
-      throw error;
-    }
-  }
-  async clearTable({ tableName }) {
-    const parsedTableName = parseSqlIdentifier(tableName, "table name");
-    try {
-      await this.client.execute(`DELETE FROM ${parsedTableName}`);
-    } catch (e) {
-      if (e instanceof Error) {
-        this.logger.error(e.message);
-      }
-    }
-  }
-  prepareStatement({ tableName, record }) {
-    const parsedTableName = parseSqlIdentifier(tableName, "table name");
-    const columns = Object.keys(record).map((col) => parseSqlIdentifier(col, "column name"));
-    const values = Object.values(record).map((v) => {
-      if (typeof v === `undefined`) {
-        return null;
-      }
-      if (v instanceof Date) {
-        return v.toISOString();
-      }
-      return typeof v === "object" ? JSON.stringify(v) : v;
-    });
-    const placeholders = values.map(() => "?").join(", ");
-    return {
-      sql: `INSERT OR REPLACE INTO ${parsedTableName} (${columns.join(", ")}) VALUES (${placeholders})`,
-      args: values
-    };
-  }
-  async insert({ tableName, record }) {
-    try {
-      await this.client.execute(
-        this.prepareStatement({
-          tableName,
-          record
-        })
-      );
-    } catch (error) {
-      this.logger.error(`Error upserting into table ${tableName}: ${error}`);
-      throw error;
-    }
-  }
-  async batchInsert({ tableName, records }) {
-    if (records.length === 0) return;
-    try {
-      const batchStatements = records.map((r) => this.prepareStatement({ tableName, record: r }));
-      await this.client.batch(batchStatements, "write");
-    } catch (error) {
-      this.logger.error(`Error upserting into table ${tableName}: ${error}`);
-      throw error;
-    }
-  }
-  async load({ tableName, keys }) {
-    const parsedTableName = parseSqlIdentifier(tableName, "table name");
-    const parsedKeys = Object.keys(keys).map((key) => parseSqlIdentifier(key, "column name"));
-    const conditions = parsedKeys.map((key) => `${key} = ?`).join(" AND ");
-    const values = Object.values(keys);
-    const result = await this.client.execute({
-      sql: `SELECT * FROM ${parsedTableName} WHERE ${conditions} ORDER BY createdAt DESC LIMIT 1`,
-      args: values
-    });
-    if (!result.rows || result.rows.length === 0) {
-      return null;
-    }
-    const row = result.rows[0];
-    const parsed = Object.fromEntries(
-      Object.entries(row || {}).map(([k, v]) => {
-        try {
-          return [k, typeof v === "string" ? v.startsWith("{") || v.startsWith("[") ? JSON.parse(v) : v : v];
-        } catch {
-          return [k, v];
-        }
-      })
-    );
-    return parsed;
-  }
-  async getThreadById({ threadId }) {
-    const result = await this.load({
-      tableName: TABLE_THREADS,
-      keys: { id: threadId }
-    });
-    if (!result) {
-      return null;
-    }
-    return {
-      ...result,
-      metadata: typeof result.metadata === "string" ? JSON.parse(result.metadata) : result.metadata
-    };
-  }
-  async getThreadsByResourceId({ resourceId }) {
-    const result = await this.client.execute({
-      sql: `SELECT * FROM ${TABLE_THREADS} WHERE resourceId = ?`,
-      args: [resourceId]
-    });
-    if (!result.rows) {
-      return [];
-    }
-    return result.rows.map((thread) => ({
-      id: thread.id,
-      resourceId: thread.resourceId,
-      title: thread.title,
-      createdAt: thread.createdAt,
-      updatedAt: thread.updatedAt,
-      metadata: typeof thread.metadata === "string" ? JSON.parse(thread.metadata) : thread.metadata
-    }));
-  }
-  async saveThread({ thread }) {
-    await this.insert({
-      tableName: TABLE_THREADS,
-      record: {
-        ...thread,
-        metadata: JSON.stringify(thread.metadata)
-      }
-    });
-    return thread;
-  }
-  async updateThread({
-    id,
-    title,
-    metadata
-  }) {
-    const thread = await this.getThreadById({ threadId: id });
-    if (!thread) {
-      throw new Error(`Thread ${id} not found`);
-    }
-    const updatedThread = {
-      ...thread,
-      title,
-      metadata: {
-        ...thread.metadata,
-        ...metadata
-      }
-    };
-    await this.client.execute({
-      sql: `UPDATE ${TABLE_THREADS} SET title = ?, metadata = ? WHERE id = ?`,
-      args: [title, JSON.stringify(updatedThread.metadata), id]
-    });
-    return updatedThread;
-  }
-  async deleteThread({ threadId }) {
-    await this.client.execute({
-      sql: `DELETE FROM ${TABLE_THREADS} WHERE id = ?`,
-      args: [threadId]
-    });
-  }
-  parseRow(row) {
-    let content = row.content;
-    try {
-      content = JSON.parse(row.content);
-    } catch {
-    }
-    return {
-      id: row.id,
-      content,
-      role: row.role,
-      type: row.type,
-      createdAt: new Date(row.createdAt),
-      threadId: row.thread_id
-    };
-  }
-  async getMessages({ threadId, selectBy }) {
-    try {
-      const messages = [];
-      const limit = typeof selectBy?.last === `number` ? selectBy.last : 40;
-      if (selectBy?.include?.length) {
-        const includeIds = selectBy.include.map((i) => i.id);
-        const maxPrev = Math.max(...selectBy.include.map((i) => i.withPreviousMessages || 0));
-        const maxNext = Math.max(...selectBy.include.map((i) => i.withNextMessages || 0));
-        const includeResult = await this.client.execute({
-          sql: `
-            WITH numbered_messages AS (
-              SELECT 
-                id,
-                content,
-                role,
-                type,
-                "createdAt",
-                thread_id,
-                ROW_NUMBER() OVER (ORDER BY "createdAt" ASC) as row_num
-              FROM "${TABLE_MESSAGES}"
-              WHERE thread_id = ?
-            ),
-            target_positions AS (
-              SELECT row_num as target_pos
-              FROM numbered_messages
-              WHERE id IN (${includeIds.map(() => "?").join(", ")})
-            )
-            SELECT DISTINCT m.*
-            FROM numbered_messages m
-            CROSS JOIN target_positions t
-            WHERE m.row_num BETWEEN (t.target_pos - ?) AND (t.target_pos + ?)
-            ORDER BY m."createdAt" ASC
-          `,
-          args: [threadId, ...includeIds, maxPrev, maxNext]
-        });
-        if (includeResult.rows) {
-          messages.push(...includeResult.rows.map((row) => this.parseRow(row)));
-        }
-      }
-      const excludeIds = messages.map((m) => m.id);
-      const remainingSql = `
-        SELECT 
-          id, 
-          content, 
-          role, 
-          type,
-          "createdAt", 
-          thread_id
-        FROM "${TABLE_MESSAGES}"
-        WHERE thread_id = ?
-        ${excludeIds.length ? `AND id NOT IN (${excludeIds.map(() => "?").join(", ")})` : ""}
-        ORDER BY "createdAt" DESC
-        LIMIT ?
-      `;
-      const remainingArgs = [threadId, ...excludeIds.length ? excludeIds : [], limit];
-      const remainingResult = await this.client.execute({
-        sql: remainingSql,
-        args: remainingArgs
-      });
-      if (remainingResult.rows) {
-        messages.push(...remainingResult.rows.map((row) => this.parseRow(row)));
-      }
-      messages.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      return messages;
-    } catch (error) {
-      this.logger.error("Error getting messages:", error);
-      throw error;
-    }
-  }
-  async saveMessages({ messages }) {
-    if (messages.length === 0) return messages;
-    try {
-      const threadId = messages[0]?.threadId;
-      if (!threadId) {
-        throw new Error("Thread ID is required");
-      }
-      const batchStatements = messages.map((message) => {
-        const time = message.createdAt || /* @__PURE__ */ new Date();
         return {
-          sql: `INSERT INTO ${TABLE_MESSAGES} (id, thread_id, content, role, type, createdAt) 
-                VALUES (?, ?, ?, ?, ?, ?)`,
-          args: [
-            message.id,
-            threadId,
-            typeof message.content === "object" ? JSON.stringify(message.content) : message.content,
-            message.role,
-            message.type,
-            time instanceof Date ? time.toISOString() : time
-          ]
+          args: {
+            generationConfig,
+            contents,
+            systemInstruction,
+            safetySettings: this.settings.safetySettings,
+            tools,
+            toolConfig,
+            cachedContent: this.settings.cachedContent
+          },
+          warnings: [...warnings, ...toolWarnings]
         };
-      });
-      await this.client.batch(batchStatements, "write");
-      return messages;
-    } catch (error) {
-      this.logger.error("Failed to save messages in database: " + error?.message);
-      throw error;
+      }
+      case "object-json": {
+        return {
+          args: {
+            generationConfig: {
+              ...generationConfig,
+              responseMimeType: "application/json",
+              responseSchema: mode.schema != null && // Google GenAI does not support all OpenAPI Schema features,
+              // so this is needed as an escape hatch:
+              this.supportsStructuredOutputs ? convertJSONSchemaToOpenAPISchema(mode.schema) : void 0
+            },
+            contents,
+            systemInstruction,
+            safetySettings: this.settings.safetySettings,
+            cachedContent: this.settings.cachedContent
+          },
+          warnings
+        };
+      }
+      case "object-tool": {
+        return {
+          args: {
+            generationConfig,
+            contents,
+            tools: {
+              functionDeclarations: [
+                {
+                  name: mode.tool.name,
+                  description: (_c = mode.tool.description) != null ? _c : "",
+                  parameters: convertJSONSchemaToOpenAPISchema(
+                    mode.tool.parameters
+                  )
+                }
+              ]
+            },
+            toolConfig: { functionCallingConfig: { mode: "ANY" } },
+            safetySettings: this.settings.safetySettings,
+            cachedContent: this.settings.cachedContent
+          },
+          warnings
+        };
+      }
+      default: {
+        const _exhaustiveCheck = type;
+        throw new Error(`Unsupported type: ${_exhaustiveCheck}`);
+      }
     }
   }
-  transformEvalRow(row) {
-    const resultValue = JSON.parse(row.result);
-    const testInfoValue = row.test_info ? JSON.parse(row.test_info) : void 0;
-    if (!resultValue || typeof resultValue !== "object" || !("score" in resultValue)) {
-      throw new Error(`Invalid MetricResult format: ${JSON.stringify(resultValue)}`);
-    }
+  supportsUrl(url) {
+    return this.config.isSupportedUrl(url);
+  }
+  async doGenerate(options) {
+    var _a, _b, _c, _d, _e;
+    const { args, warnings } = await this.getArgs(options);
+    const body = JSON.stringify(args);
+    const mergedHeaders = combineHeaders(
+      await resolve(this.config.headers),
+      options.headers
+    );
+    const {
+      responseHeaders,
+      value: response,
+      rawValue: rawResponse
+    } = await postJsonToApi({
+      url: `${this.config.baseURL}/${getModelPath(
+        this.modelId
+      )}:generateContent`,
+      headers: mergedHeaders,
+      body: args,
+      failedResponseHandler: googleFailedResponseHandler,
+      successfulResponseHandler: createJsonResponseHandler(responseSchema),
+      abortSignal: options.abortSignal,
+      fetch: this.config.fetch
+    });
+    const { contents: rawPrompt, ...rawSettings } = args;
+    const candidate = response.candidates[0];
+    const parts = candidate.content == null || typeof candidate.content !== "object" || !("parts" in candidate.content) ? [] : candidate.content.parts;
+    const toolCalls = getToolCallsFromParts({
+      parts,
+      // Use candidateParts
+      generateId: this.config.generateId
+    });
+    const usageMetadata = response.usageMetadata;
     return {
-      input: row.input,
-      output: row.output,
-      result: resultValue,
-      agentName: row.agent_name,
-      metricName: row.metric_name,
-      instructions: row.instructions,
-      testInfo: testInfoValue,
-      globalRunId: row.global_run_id,
-      runId: row.run_id,
-      createdAt: row.created_at
+      text: getTextFromParts(parts),
+      reasoning: getReasoningDetailsFromParts(parts),
+      files: (_a = getInlineDataParts(parts)) == null ? void 0 : _a.map((part) => ({
+        data: part.inlineData.data,
+        mimeType: part.inlineData.mimeType
+      })),
+      toolCalls,
+      finishReason: mapGoogleGenerativeAIFinishReason({
+        finishReason: candidate.finishReason,
+        hasToolCalls: toolCalls != null && toolCalls.length > 0
+      }),
+      usage: {
+        promptTokens: (_b = usageMetadata == null ? void 0 : usageMetadata.promptTokenCount) != null ? _b : NaN,
+        completionTokens: (_c = usageMetadata == null ? void 0 : usageMetadata.candidatesTokenCount) != null ? _c : NaN
+      },
+      rawCall: { rawPrompt, rawSettings },
+      rawResponse: { headers: responseHeaders, body: rawResponse },
+      warnings,
+      providerMetadata: {
+        google: {
+          groundingMetadata: (_d = candidate.groundingMetadata) != null ? _d : null,
+          safetyRatings: (_e = candidate.safetyRatings) != null ? _e : null
+        }
+      },
+      sources: extractSources({
+        groundingMetadata: candidate.groundingMetadata,
+        generateId: this.config.generateId
+      }),
+      request: { body }
     };
   }
-  async getEvalsByAgentName(agentName, type) {
-    try {
-      const baseQuery = `SELECT * FROM ${TABLE_EVALS} WHERE agent_name = ?`;
-      const typeCondition = type === "test" ? " AND test_info IS NOT NULL AND test_info->>'testPath' IS NOT NULL" : type === "live" ? " AND (test_info IS NULL OR test_info->>'testPath' IS NULL)" : "";
-      const result = await this.client.execute({
-        sql: `${baseQuery}${typeCondition} ORDER BY created_at DESC`,
-        args: [agentName]
-      });
-      return result.rows?.map((row) => this.transformEvalRow(row)) ?? [];
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("no such table")) {
-        return [];
-      }
-      this.logger.error("Failed to get evals for the specified agent: " + error?.message);
-      throw error;
-    }
-  }
-  // TODO: add types
-  async getTraces({
-    name,
-    scope,
-    page,
-    perPage,
-    attributes,
-    filters,
-    fromDate,
-    toDate
-  } = {
-    page: 0,
-    perPage: 100
-  }) {
-    const limit = perPage;
-    const offset = page * perPage;
-    const args = [];
-    const conditions = [];
-    if (name) {
-      conditions.push("name LIKE CONCAT(?, '%')");
-    }
-    if (scope) {
-      conditions.push("scope = ?");
-    }
-    if (attributes) {
-      Object.keys(attributes).forEach((key) => {
-        conditions.push(`attributes->>'$.${key}' = ?`);
-      });
-    }
-    if (filters) {
-      Object.entries(filters).forEach(([key, _value]) => {
-        conditions.push(`${key} = ?`);
-      });
-    }
-    if (fromDate) {
-      conditions.push("createdAt >= ?");
-    }
-    if (toDate) {
-      conditions.push("createdAt <= ?");
-    }
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-    if (name) {
-      args.push(name);
-    }
-    if (scope) {
-      args.push(scope);
-    }
-    if (attributes) {
-      for (const [, value] of Object.entries(attributes)) {
-        args.push(value);
-      }
-    }
-    if (filters) {
-      for (const [, value] of Object.entries(filters)) {
-        args.push(value);
-      }
-    }
-    if (fromDate) {
-      args.push(fromDate.toISOString());
-    }
-    if (toDate) {
-      args.push(toDate.toISOString());
-    }
-    args.push(limit, offset);
-    const result = await this.client.execute({
-      sql: `SELECT * FROM ${TABLE_TRACES} ${whereClause} ORDER BY "startTime" DESC LIMIT ? OFFSET ?`,
-      args
+  async doStream(options) {
+    const { args, warnings } = await this.getArgs(options);
+    const body = JSON.stringify(args);
+    const headers = combineHeaders(
+      await resolve(this.config.headers),
+      options.headers
+    );
+    const { responseHeaders, value: response } = await postJsonToApi({
+      url: `${this.config.baseURL}/${getModelPath(
+        this.modelId
+      )}:streamGenerateContent?alt=sse`,
+      headers,
+      body: args,
+      failedResponseHandler: googleFailedResponseHandler,
+      successfulResponseHandler: createEventSourceResponseHandler(chunkSchema),
+      abortSignal: options.abortSignal,
+      fetch: this.config.fetch
     });
-    if (!result.rows) {
-      return [];
-    }
-    return result.rows.map((row) => ({
-      id: row.id,
-      parentSpanId: row.parentSpanId,
-      traceId: row.traceId,
-      name: row.name,
-      scope: row.scope,
-      kind: row.kind,
-      status: safelyParseJSON(row.status),
-      events: safelyParseJSON(row.events),
-      links: safelyParseJSON(row.links),
-      attributes: safelyParseJSON(row.attributes),
-      startTime: row.startTime,
-      endTime: row.endTime,
-      other: safelyParseJSON(row.other),
-      createdAt: row.createdAt
-    }));
-  }
-  async getWorkflowRuns({
-    workflowName,
-    fromDate,
-    toDate,
-    limit,
-    offset,
-    resourceId
-  } = {}) {
-    try {
-      const conditions = [];
-      const args = [];
-      if (workflowName) {
-        conditions.push("workflow_name = ?");
-        args.push(workflowName);
-      }
-      if (fromDate) {
-        conditions.push("createdAt >= ?");
-        args.push(fromDate.toISOString());
-      }
-      if (toDate) {
-        conditions.push("createdAt <= ?");
-        args.push(toDate.toISOString());
-      }
-      if (resourceId) {
-        const hasResourceId = await this.hasColumn(TABLE_WORKFLOW_SNAPSHOT, "resourceId");
-        if (hasResourceId) {
-          conditions.push("resourceId = ?");
-          args.push(resourceId);
-        } else {
-          console.warn(`[${TABLE_WORKFLOW_SNAPSHOT}] resourceId column not found. Skipping resourceId filter.`);
-        }
-      }
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-      let total = 0;
-      if (limit !== void 0 && offset !== void 0) {
-        const countResult = await this.client.execute({
-          sql: `SELECT COUNT(*) as count FROM ${TABLE_WORKFLOW_SNAPSHOT} ${whereClause}`,
-          args
-        });
-        total = Number(countResult.rows?.[0]?.count ?? 0);
-      }
-      const result = await this.client.execute({
-        sql: `SELECT * FROM ${TABLE_WORKFLOW_SNAPSHOT} ${whereClause} ORDER BY createdAt DESC${limit !== void 0 && offset !== void 0 ? ` LIMIT ? OFFSET ?` : ""}`,
-        args: limit !== void 0 && offset !== void 0 ? [...args, limit, offset] : args
-      });
-      const runs = (result.rows || []).map((row) => this.parseWorkflowRun(row));
-      return { runs, total: total || runs.length };
-    } catch (error) {
-      console.error("Error getting workflow runs:", error);
-      throw error;
-    }
-  }
-  async getWorkflowRunById({
-    runId,
-    workflowName
-  }) {
-    const conditions = [];
-    const args = [];
-    if (runId) {
-      conditions.push("run_id = ?");
-      args.push(runId);
-    }
-    if (workflowName) {
-      conditions.push("workflow_name = ?");
-      args.push(workflowName);
-    }
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-    const result = await this.client.execute({
-      sql: `SELECT * FROM ${TABLE_WORKFLOW_SNAPSHOT} ${whereClause}`,
-      args
-    });
-    if (!result.rows?.[0]) {
-      return null;
-    }
-    return this.parseWorkflowRun(result.rows[0]);
-  }
-  async hasColumn(table, column) {
-    const result = await this.client.execute({
-      sql: `PRAGMA table_info(${table})`
-    });
-    return (await result.rows)?.some((row) => row.name === column);
-  }
-  parseWorkflowRun(row) {
-    let parsedSnapshot = row.snapshot;
-    if (typeof parsedSnapshot === "string") {
-      try {
-        parsedSnapshot = JSON.parse(row.snapshot);
-      } catch (e) {
-        console.warn(`Failed to parse snapshot for workflow ${row.workflow_name}: ${e}`);
-      }
-    }
+    const { contents: rawPrompt, ...rawSettings } = args;
+    let finishReason = "unknown";
+    let usage = {
+      promptTokens: Number.NaN,
+      completionTokens: Number.NaN
+    };
+    let providerMetadata = void 0;
+    const generateId2 = this.config.generateId;
+    let hasToolCalls = false;
     return {
-      workflowName: row.workflow_name,
-      runId: row.run_id,
-      snapshot: parsedSnapshot,
-      resourceId: row.resourceId,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at)
+      stream: response.pipeThrough(
+        new TransformStream({
+          transform(chunk, controller) {
+            var _a, _b, _c, _d, _e, _f;
+            if (!chunk.success) {
+              controller.enqueue({ type: "error", error: chunk.error });
+              return;
+            }
+            const value = chunk.value;
+            const usageMetadata = value.usageMetadata;
+            if (usageMetadata != null) {
+              usage = {
+                promptTokens: (_a = usageMetadata.promptTokenCount) != null ? _a : NaN,
+                completionTokens: (_b = usageMetadata.candidatesTokenCount) != null ? _b : NaN
+              };
+            }
+            const candidate = (_c = value.candidates) == null ? void 0 : _c[0];
+            if (candidate == null) {
+              return;
+            }
+            const content = candidate.content;
+            if (content != null) {
+              const deltaText = getTextFromParts(content.parts);
+              if (deltaText != null) {
+                controller.enqueue({
+                  type: "text-delta",
+                  textDelta: deltaText
+                });
+              }
+              const reasoningDeltaText = getReasoningDetailsFromParts(
+                content.parts
+              );
+              if (reasoningDeltaText != null) {
+                for (const part of reasoningDeltaText) {
+                  controller.enqueue({
+                    type: "reasoning",
+                    textDelta: part.text
+                  });
+                }
+              }
+              const inlineDataParts = getInlineDataParts(content.parts);
+              if (inlineDataParts != null) {
+                for (const part of inlineDataParts) {
+                  controller.enqueue({
+                    type: "file",
+                    mimeType: part.inlineData.mimeType,
+                    data: part.inlineData.data
+                  });
+                }
+              }
+              const toolCallDeltas = getToolCallsFromParts({
+                parts: content.parts,
+                generateId: generateId2
+              });
+              if (toolCallDeltas != null) {
+                for (const toolCall of toolCallDeltas) {
+                  controller.enqueue({
+                    type: "tool-call-delta",
+                    toolCallType: "function",
+                    toolCallId: toolCall.toolCallId,
+                    toolName: toolCall.toolName,
+                    argsTextDelta: toolCall.args
+                  });
+                  controller.enqueue({
+                    type: "tool-call",
+                    toolCallType: "function",
+                    toolCallId: toolCall.toolCallId,
+                    toolName: toolCall.toolName,
+                    args: toolCall.args
+                  });
+                  hasToolCalls = true;
+                }
+              }
+            }
+            if (candidate.finishReason != null) {
+              finishReason = mapGoogleGenerativeAIFinishReason({
+                finishReason: candidate.finishReason,
+                hasToolCalls
+              });
+              const sources = (_d = extractSources({
+                groundingMetadata: candidate.groundingMetadata,
+                generateId: generateId2
+              })) != null ? _d : [];
+              for (const source of sources) {
+                controller.enqueue({ type: "source", source });
+              }
+              providerMetadata = {
+                google: {
+                  groundingMetadata: (_e = candidate.groundingMetadata) != null ? _e : null,
+                  safetyRatings: (_f = candidate.safetyRatings) != null ? _f : null
+                }
+              };
+            }
+          },
+          flush(controller) {
+            controller.enqueue({
+              type: "finish",
+              finishReason,
+              usage,
+              providerMetadata
+            });
+          }
+        })
+      ),
+      rawCall: { rawPrompt, rawSettings },
+      rawResponse: { headers: responseHeaders },
+      warnings,
+      request: { body }
     };
   }
 };
+function getToolCallsFromParts({
+  parts,
+  generateId: generateId2
+}) {
+  const functionCallParts = parts == null ? void 0 : parts.filter(
+    (part) => "functionCall" in part
+  );
+  return functionCallParts == null || functionCallParts.length === 0 ? void 0 : functionCallParts.map((part) => ({
+    toolCallType: "function",
+    toolCallId: generateId2(),
+    toolName: part.functionCall.name,
+    args: JSON.stringify(part.functionCall.args)
+  }));
+}
+function getTextFromParts(parts) {
+  const textParts = parts == null ? void 0 : parts.filter(
+    (part) => "text" in part && part.thought !== true
+  );
+  return textParts == null || textParts.length === 0 ? void 0 : textParts.map((part) => part.text).join("");
+}
+function getReasoningDetailsFromParts(parts) {
+  const reasoningParts = parts == null ? void 0 : parts.filter(
+    (part) => "text" in part && part.thought === true
+  );
+  return reasoningParts == null || reasoningParts.length === 0 ? void 0 : reasoningParts.map((part) => ({ type: "text", text: part.text }));
+}
+function getInlineDataParts(parts) {
+  return parts == null ? void 0 : parts.filter(
+    (part) => "inlineData" in part
+  );
+}
+function extractSources({
+  groundingMetadata,
+  generateId: generateId2
+}) {
+  var _a;
+  return (_a = groundingMetadata == null ? void 0 : groundingMetadata.groundingChunks) == null ? void 0 : _a.filter(
+    (chunk) => chunk.web != null
+  ).map((chunk) => ({
+    sourceType: "url",
+    id: generateId2(),
+    url: chunk.web.uri,
+    title: chunk.web.title
+  }));
+}
+var contentSchema = objectType({
+  role: stringType(),
+  parts: arrayType(
+    unionType([
+      objectType({
+        text: stringType(),
+        thought: booleanType().nullish()
+      }),
+      objectType({
+        functionCall: objectType({
+          name: stringType(),
+          args: unknownType()
+        })
+      }),
+      objectType({
+        inlineData: objectType({
+          mimeType: stringType(),
+          data: stringType()
+        })
+      })
+    ])
+  ).nullish()
+});
+var groundingChunkSchema = objectType({
+  web: objectType({ uri: stringType(), title: stringType() }).nullish(),
+  retrievedContext: objectType({ uri: stringType(), title: stringType() }).nullish()
+});
+var groundingMetadataSchema = objectType({
+  webSearchQueries: arrayType(stringType()).nullish(),
+  retrievalQueries: arrayType(stringType()).nullish(),
+  searchEntryPoint: objectType({ renderedContent: stringType() }).nullish(),
+  groundingChunks: arrayType(groundingChunkSchema).nullish(),
+  groundingSupports: arrayType(
+    objectType({
+      segment: objectType({
+        startIndex: numberType().nullish(),
+        endIndex: numberType().nullish(),
+        text: stringType().nullish()
+      }),
+      segment_text: stringType().nullish(),
+      groundingChunkIndices: arrayType(numberType()).nullish(),
+      supportChunkIndices: arrayType(numberType()).nullish(),
+      confidenceScores: arrayType(numberType()).nullish(),
+      confidenceScore: arrayType(numberType()).nullish()
+    })
+  ).nullish(),
+  retrievalMetadata: unionType([
+    objectType({
+      webDynamicRetrievalScore: numberType()
+    }),
+    objectType({})
+  ]).nullish()
+});
+var safetyRatingSchema = objectType({
+  category: stringType().nullish(),
+  probability: stringType().nullish(),
+  probabilityScore: numberType().nullish(),
+  severity: stringType().nullish(),
+  severityScore: numberType().nullish(),
+  blocked: booleanType().nullish()
+});
+var responseSchema = objectType({
+  candidates: arrayType(
+    objectType({
+      content: contentSchema.nullish().or(objectType({}).strict()),
+      finishReason: stringType().nullish(),
+      safetyRatings: arrayType(safetyRatingSchema).nullish(),
+      groundingMetadata: groundingMetadataSchema.nullish()
+    })
+  ),
+  usageMetadata: objectType({
+    promptTokenCount: numberType().nullish(),
+    candidatesTokenCount: numberType().nullish(),
+    totalTokenCount: numberType().nullish()
+  }).nullish()
+});
+var chunkSchema = objectType({
+  candidates: arrayType(
+    objectType({
+      content: contentSchema.nullish(),
+      finishReason: stringType().nullish(),
+      safetyRatings: arrayType(safetyRatingSchema).nullish(),
+      groundingMetadata: groundingMetadataSchema.nullish()
+    })
+  ).nullish(),
+  usageMetadata: objectType({
+    promptTokenCount: numberType().nullish(),
+    candidatesTokenCount: numberType().nullish(),
+    totalTokenCount: numberType().nullish()
+  }).nullish()
+});
+var googleGenerativeAIProviderOptionsSchema = objectType({
+  responseModalities: arrayType(enumType(["TEXT", "IMAGE"])).nullish(),
+  thinkingConfig: objectType({
+    thinkingBudget: numberType().nullish(),
+    includeThoughts: booleanType().nullish()
+  }).nullish()
+});
+var GoogleGenerativeAIEmbeddingModel = class {
+  constructor(modelId, settings, config) {
+    this.specificationVersion = "v1";
+    this.modelId = modelId;
+    this.settings = settings;
+    this.config = config;
+  }
+  get provider() {
+    return this.config.provider;
+  }
+  get maxEmbeddingsPerCall() {
+    return 2048;
+  }
+  get supportsParallelCalls() {
+    return true;
+  }
+  async doEmbed({
+    values,
+    headers,
+    abortSignal
+  }) {
+    if (values.length > this.maxEmbeddingsPerCall) {
+      throw new TooManyEmbeddingValuesForCallError({
+        provider: this.provider,
+        modelId: this.modelId,
+        maxEmbeddingsPerCall: this.maxEmbeddingsPerCall,
+        values
+      });
+    }
+    const mergedHeaders = combineHeaders(
+      await resolve(this.config.headers),
+      headers
+    );
+    const { responseHeaders, value: response } = await postJsonToApi({
+      url: `${this.config.baseURL}/models/${this.modelId}:batchEmbedContents`,
+      headers: mergedHeaders,
+      body: {
+        requests: values.map((value) => ({
+          model: `models/${this.modelId}`,
+          content: { role: "user", parts: [{ text: value }] },
+          outputDimensionality: this.settings.outputDimensionality,
+          taskType: this.settings.taskType
+        }))
+      },
+      failedResponseHandler: googleFailedResponseHandler,
+      successfulResponseHandler: createJsonResponseHandler(
+        googleGenerativeAITextEmbeddingResponseSchema
+      ),
+      abortSignal,
+      fetch: this.config.fetch
+    });
+    return {
+      embeddings: response.embeddings.map((item) => item.values),
+      usage: void 0,
+      rawResponse: { headers: responseHeaders }
+    };
+  }
+};
+var googleGenerativeAITextEmbeddingResponseSchema = objectType({
+  embeddings: arrayType(objectType({ values: arrayType(numberType()) }))
+});
+
+// src/google-supported-file-url.ts
+function isSupportedFileUrl(url) {
+  return url.toString().startsWith("https://generativelanguage.googleapis.com/v1beta/files/");
+}
+
+// src/google-provider.ts
+function createGoogleGenerativeAI(options = {}) {
+  var _a;
+  const baseURL = (_a = withoutTrailingSlash(options.baseURL)) != null ? _a : "https://generativelanguage.googleapis.com/v1beta";
+  const getHeaders = () => ({
+    "x-goog-api-key": loadApiKey({
+      apiKey: options.apiKey,
+      environmentVariableName: "GOOGLE_GENERATIVE_AI_API_KEY",
+      description: "Google Generative AI"
+    }),
+    ...options.headers
+  });
+  const createChatModel = (modelId, settings = {}) => {
+    var _a2;
+    return new GoogleGenerativeAILanguageModel(modelId, settings, {
+      provider: "google.generative-ai",
+      baseURL,
+      headers: getHeaders,
+      generateId: (_a2 = options.generateId) != null ? _a2 : generateId,
+      isSupportedUrl: isSupportedFileUrl,
+      fetch: options.fetch
+    });
+  };
+  const createEmbeddingModel = (modelId, settings = {}) => new GoogleGenerativeAIEmbeddingModel(modelId, settings, {
+    provider: "google.generative-ai",
+    baseURL,
+    headers: getHeaders,
+    fetch: options.fetch
+  });
+  const provider = function(modelId, settings) {
+    if (new.target) {
+      throw new Error(
+        "The Google Generative AI model function cannot be called with the new keyword."
+      );
+    }
+    return createChatModel(modelId, settings);
+  };
+  provider.languageModel = createChatModel;
+  provider.chat = createChatModel;
+  provider.generativeAI = createChatModel;
+  provider.embedding = createEmbeddingModel;
+  provider.textEmbedding = createEmbeddingModel;
+  provider.textEmbeddingModel = createEmbeddingModel;
+  return provider;
+}
+var google = createGoogleGenerativeAI();
+
+const DEFAULT_MODEL_ID = "gemini-2.5-flash-preview-05-20";
+const ADVANCED_MODEL_ID = "gemini-2.5-pro-preview-05-06";
+const DEFAULT_EMBEDDING_MODEL_ID = "gemini-embedding-exp-03-07";
+const DEFAULT_EMBEDDING_MODEL_DIMENSIONS = 1536;
+const DEFAULT_EMBEDDING_MODEL_TASK_TYPE = "SEMANTIC_SIMILARITY";
+const defaultModel = google(DEFAULT_MODEL_ID);
+google(ADVANCED_MODEL_ID);
+const defaultEmbeddingModel = google.textEmbeddingModel(
+  DEFAULT_EMBEDDING_MODEL_ID,
+  {
+    outputDimensionality: DEFAULT_EMBEDDING_MODEL_DIMENSIONS,
+    taskType: DEFAULT_EMBEDDING_MODEL_TASK_TYPE
+  }
+);
 
 const LAST_MESSAGES = 42;
-const EMBEDDING_MODEL = "gemini-embedding-exp-03-07";
 function getMemory() {
   return process.env.VERCEL ? getUpstashMemory() : getLocalMemory();
 }
@@ -30933,9 +30947,7 @@ function getLocalMemory() {
     vector: new LibSQLVector({
       connectionUrl: process.env.DATABASE_URL || "file:local.db"
     }),
-    embedder: google.textEmbeddingModel(EMBEDDING_MODEL, {
-      outputDimensionality: 1536
-    }),
+    embedder: defaultEmbeddingModel,
     options: {
       lastMessages: LAST_MESSAGES,
       semanticRecall: true,
@@ -30951,10 +30963,7 @@ function getUpstashMemory() {
   return new Memory({
     storage: new UpstashStore(upstashStorageOptions),
     vector: new UpstashVector(upstashVectorOptions),
-    embedder: google.textEmbeddingModel(EMBEDDING_MODEL, {
-      outputDimensionality: 1536,
-      taskType: "SEMANTIC_SIMILARITY"
-    }),
+    embedder: defaultEmbeddingModel,
     options: {
       lastMessages: LAST_MESSAGES,
       semanticRecall: true,
@@ -31001,7 +31010,7 @@ const conversationAgent = new Agent({
       - If the conversation touches on sensitive topics, handle them with care and suggest seeking professional help if appropriate, while maintaining a supportive stance.
       - Your goal is to create a meaningful and enriching conversational experience.
 `,
-  model: google("gemini-1.5-pro-latest"),
+  model: defaultModel,
   tools: {},
   // No specific tools for now, focused on conversation
   memory: getMemory()
@@ -31206,7 +31215,7 @@ const weatherAgent = new Agent({
 
       Use the weatherTool to fetch current weather data.
 `,
-  model: google("gemini-1.5-pro-latest"),
+  model: defaultModel,
   tools: { weatherTool },
   memory: getMemory()
 });

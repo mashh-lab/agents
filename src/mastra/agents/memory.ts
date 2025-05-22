@@ -1,23 +1,22 @@
-import { UpstashStore, UpstashVector } from '@mastra/upstash'
-import { Memory } from '@mastra/memory'
 import { LibSQLStore, LibSQLVector } from '@mastra/libsql'
-import { google } from '@ai-sdk/google'
+import { Memory } from '@mastra/memory'
+import { UpstashStore, UpstashVector } from '@mastra/upstash'
+import { defaultEmbeddingModel } from './models'
 
 const LAST_MESSAGES = 42
-const EMBEDDING_MODEL = 'gemini-embedding-exp-03-07'
 
 /**
  * Get the memory instance based on the environment.
  *
  * If the environment is VERCEL, use Upstash for storage and vector.
  * Otherwise, use LibSQL for local storage and vector.
- * @returns {Memory} The memory instance.
+ * @returns The memory instance.
  */
-export function getMemory() {
+export function getMemory(): Memory {
   return process.env.VERCEL ? getUpstashMemory() : getLocalMemory()
 }
 
-function getLocalMemory() {
+function getLocalMemory(): Memory {
   return new Memory({
     storage: new LibSQLStore({
       url: process.env.DATABASE_URL || 'file:local.db',
@@ -25,9 +24,7 @@ function getLocalMemory() {
     vector: new LibSQLVector({
       connectionUrl: process.env.DATABASE_URL || 'file:local.db',
     }),
-    embedder: google.textEmbeddingModel(EMBEDDING_MODEL, {
-      outputDimensionality: 1536,
-    }),
+    embedder: defaultEmbeddingModel,
     options: {
       lastMessages: LAST_MESSAGES,
       semanticRecall: true,
@@ -38,17 +35,14 @@ function getLocalMemory() {
   })
 }
 
-function getUpstashMemory() {
+function getUpstashMemory(): Memory {
   const upstashStorageOptions = getUpstashStorageOptions()
   const upstashVectorOptions = getUpstashVectorOptions()
 
   return new Memory({
     storage: new UpstashStore(upstashStorageOptions),
     vector: new UpstashVector(upstashVectorOptions),
-    embedder: google.textEmbeddingModel(EMBEDDING_MODEL, {
-      outputDimensionality: 1536,
-      taskType: 'SEMANTIC_SIMILARITY',
-    }),
+    embedder: defaultEmbeddingModel,
     options: {
       lastMessages: LAST_MESSAGES,
       semanticRecall: true,

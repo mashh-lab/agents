@@ -1,1 +1,1 @@
-export const tools = ["./tools/1231f7d3-de4e-4ea1-8645-afbda81a8dab.mjs"];
+export const tools = ["./tools/fb0cb154-d74e-466e-8ada-223aabee8f20.mjs"];

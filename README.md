@@ -1,6 +1,6 @@
 # agents
 
-This is a Node.js application built with the Mastra framework. It demonstrates the creation and use of AI agents with specific functionalities, including conversational abilities and tool usage for external data interactions.
+This is a Node.js application built with [Mastra](https://github.com/mastra-ai/mastra). It demonstrates the creation and use of AI agents with specific functionalities, including conversational abilities and tool usage for external data interactions.
 
 ## Features
 

@@ -8,7 +8,6 @@
       "config": {
         "includeFiles": [
           "index.mjs",
-          "index2.mjs",
           "instrumentation.mjs",
           "mastra.mjs",
           "package.json",
@@ -16,7 +15,7 @@
           "telemetry-config.mjs",
           "tools",
           "tools.mjs",
-          "tools/29331ccf-bca1-4b49-9097-5c9eb2652359.mjs"
+          "tools/413c9542-8d70-451d-a8eb-d6633c04ee93.mjs"
         ]
       }
     }

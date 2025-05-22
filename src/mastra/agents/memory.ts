@@ -1,6 +1,7 @@
 import { UpstashStore, UpstashVector } from '@mastra/upstash'
 import { Memory } from '@mastra/memory'
-import { LibSQLStore, LibSQLVector } from '@mastra/libsql'
+import { LibSQLStore } from '@mastra/libsql'
+
 
 export function getMemory() {
   return process.env.VERCEL ? getUpstashMemory() : getLocalMemory()
@@ -52,7 +53,7 @@ function getLocalMemory() {
     }),
     options: {
       lastMessages: 10,
-      semanticRecall: true,
+      semanticRecall: false,
     },
   });
 }

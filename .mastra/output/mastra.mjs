@@ -30195,7 +30195,7 @@ function getLocalMemory() {
     }),
     options: {
       lastMessages: 10,
-      semanticRecall: true
+      semanticRecall: false
     }
   });
 }

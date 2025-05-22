@@ -30921,7 +30921,7 @@ var LibSQLStore = class extends MastraStorage {
 };
 
 const LAST_MESSAGES = 42;
-const EMBEDDING_MODEL = "text-embedding-004";
+const EMBEDDING_MODEL = "gemini-embedding-exp-03-07";
 function getMemory() {
   return process.env.VERCEL ? getUpstashMemory() : getLocalMemory();
 }
@@ -30949,10 +30949,7 @@ function getUpstashMemory() {
   return new Memory({
     storage: new UpstashStore(upstashStorageOptions),
     vector: new UpstashVector(upstashVectorOptions),
-    embedder: google.textEmbeddingModel(EMBEDDING_MODEL, {
-      outputDimensionality: 768,
-      taskType: "SEMANTIC_SIMILARITY"
-    }),
+    embedder: google.textEmbeddingModel(EMBEDDING_MODEL),
     options: {
       lastMessages: LAST_MESSAGES,
       semanticRecall: true,

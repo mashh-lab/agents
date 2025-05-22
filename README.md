@@ -92,16 +92,16 @@ This will start the local Mastra server and expose the Mastra Playground at http
 
 ### Deploying
 
-You can deploy this application to Vercel by running the following command:
-
-```bash
-pnpm run vercel
-```
-
 This repository is configured for a seamless Vercel deployment workflow:
 
 - **Preview Deployments:** On every push to a branch that is not `main`, Vercel automatically creates a preview deployment. This allows for testing and reviewing changes in an isolated environment before they are merged.
 - **Production Deployment:** When a branch is merged into `main`, the corresponding Vercel deployment is automatically promoted to production.
+
+You can manually deploy this application to Vercel by running the following command:
+
+```bash
+pnpm run vercel
+```
 
 Ensure that you have set the required Vercel environment variables as described in the [Deployment](#deployment) section further down.
 
@@ -161,7 +161,11 @@ This project is licensed under the ISC License. See the [LICENSE](LICENSE) file 
 
 ## Contributing
 
-Contributions are welcome! Please feel free to open an issue or submit a pull request.
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) to get started.
+
+We also expect everyone participating in our community to follow our [Code of Conduct](CODE_OF_CONDUCT.md). Please make sure you are familiar with it.
+
+### How to Contribute
 
 1.  Fork the Project
 2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)

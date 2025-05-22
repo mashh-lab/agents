@@ -22,14 +22,20 @@ export const mastra = new Mastra({
     },
   },
   telemetry: {
-    serviceName: "loops-within-loops",
+    serviceName: 'loops-within-loops',
     enabled: false,
     sampling: {
-      type: "always_on",
+      type: 'always_on',
     },
   },
 })
 
+/**
+ * Processes a CORS request by checking if the origin is allowed.
+ *
+ * @param requestOrigin The origin of the request.
+ * @returns The request origin if allowed, otherwise null.
+ */
 function processCorsRequest(requestOrigin?: string) {
   if (!requestOrigin) {
     return null // Disallow if no origin header
@@ -47,10 +53,7 @@ function processCorsRequest(requestOrigin?: string) {
     try {
       // Convert wildcard pattern to regex
       // 1. Escape special regex characters in the pattern itself
-      let regexString = pattern.replace(
-        /[.\+?\^\[\]\(\)\{\}\$\|]/g,
-        '\\$&',
-      )
+      let regexString = pattern.replace(/[.\+?\^\[\]\(\)\{\}\$\|]/g, '\\$&')
       // 2. Replace wildcard * with .* (match any characters)
       regexString = regexString.replace(/\*/g, '.*')
       // 3. Anchor the regex to match the entire string
@@ -72,10 +75,23 @@ function processCorsRequest(requestOrigin?: string) {
   }
 }
 
+/**
+ * Gets the deployer based on the environment.
+ *
+ * @returns The VercelDeployer if in a Vercel environment, otherwise undefined.
+ */
 function getDeployer() {
-  return process.env.VERCEL ? new VercelDeployer(getVercelDeployerOptions()) : undefined
+  return process.env.VERCEL
+    ? new VercelDeployer(getVercelDeployerOptions())
+    : undefined
 }
 
+/**
+ * Gets the Vercel deployer options from environment variables.
+ *
+ * @returns The Vercel deployer options.
+ * @throws Error if VERCEL_TOKEN, VERCEL_TEAM_SLUG, or VERCEL_PROJECT_NAME are not set.
+ */
 function getVercelDeployerOptions() {
   if (
     !process.env.VERCEL_TOKEN ||
@@ -93,7 +109,11 @@ function getVercelDeployerOptions() {
   }
 }
 
+/**
+ * Gets the allowed CORS origins from environment variables.
+ *
+ * @returns A string of allowed CORS origins, defaulting to 'http://localhost:3000'.
+ */
 function getCorsAllowedOrigins() {
   return process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000'
 }
-

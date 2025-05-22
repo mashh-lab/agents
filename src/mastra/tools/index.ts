@@ -40,6 +40,13 @@ export const weatherTool = createTool({
   },
 })
 
+/**
+ * Fetches weather data for a given location.
+ *
+ * @param location The name of the location to get weather for.
+ * @returns An object containing weather information.
+ * @throws Error if the location is not found.
+ */
 const getWeather = async (location: string) => {
   const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(location)}&count=1`
   const geocodingResponse = await fetch(geocodingUrl)
@@ -67,6 +74,13 @@ const getWeather = async (location: string) => {
   }
 }
 
+/**
+ * Gets a human-readable weather condition string for a given WMO weather code.
+ * See https://open-meteo.com/en/docs#weathervariables for more info on WMO codes.
+ *
+ * @param code The WMO weather interpretation code.
+ * @returns A string describing the weather condition, or "Unknown" if the code is not recognized.
+ */
 function getWeatherCondition(code: number): string {
   const conditions: Record<number, string> = {
     0: 'Clear sky',

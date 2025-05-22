@@ -1,6 +1,6 @@
-import { google } from '@ai-sdk/google'
 import { Agent } from '@mastra/core/agent'
 import { getMemory } from './memory'
+import { defaultModel } from './models'
 
 export const conversationAgent = new Agent({
   name: 'Conversation Agent',
@@ -20,7 +20,7 @@ export const conversationAgent = new Agent({
       - If the conversation touches on sensitive topics, handle them with care and suggest seeking professional help if appropriate, while maintaining a supportive stance.
       - Your goal is to create a meaningful and enriching conversational experience.
 `,
-  model: google('gemini-1.5-pro-latest'),
+  model: defaultModel,
   tools: {}, // No specific tools for now, focused on conversation
   memory: getMemory(),
 })

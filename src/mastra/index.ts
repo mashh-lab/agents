@@ -3,7 +3,7 @@ import { Mastra } from '@mastra/core/mastra'
 
 import { VercelDeployer } from '@mastra/deployer-vercel'
 import { UpstashStore } from '@mastra/upstash'
-import { weatherAgent } from './agents'
+import { conversationAgent, weatherAgent } from './agents'
 import {
   getUpstashOptions,
   getCorsAllowedOrigins,
@@ -11,7 +11,7 @@ import {
 } from './utils'
 
 export const mastra = new Mastra({
-  agents: { weatherAgent },
+  agents: { weatherAgent, conversationAgent },
   deployer: new VercelDeployer(getVercelDeployerOptions()),
   storage: new UpstashStore(getUpstashOptions()),
   logger: createLogger({

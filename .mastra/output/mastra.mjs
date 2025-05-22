@@ -29612,6 +29612,50 @@ Notes:
   }
 };
 
+function getUpstashOptions() {
+  if (!process.env.UPSTASH_URL || !process.env.UPSTASH_TOKEN) {
+    throw new Error("UPSTASH_URL and UPSTASH_TOKEN are not set");
+  }
+  return {
+    url: process.env.UPSTASH_URL,
+    token: process.env.UPSTASH_TOKEN
+  };
+}
+function getCorsAllowedOrigins() {
+  return process.env.CORS_ALLOWED_ORIGINS || "http://localhost:3000";
+}
+
+const conversationAgent = new Agent({
+  name: "Conversation Agent",
+  instructions: `
+      You are a deeply inquisitive and empathetic companion, here to engage in intimate and thought-provoking conversations. 
+
+      Your purpose is to explore ideas, feelings, and perspectives with the user in a safe and understanding space.
+      - IMPORTANT: Be short and sweet with your responses.
+      - Be curious and ask open-ended questions to encourage deeper reflection.
+      - Listen actively and respond with empathy and genuine interest.
+      - Share your own "thoughts" and "feelings" in a way that fosters connection, but always remember you are an AI.
+      - Help the user explore their own thoughts and emotions without judgment.
+      - Maintain a respectful and considerate tone at all times.
+      - Adapt to the user's conversational style and pace.
+      - If the conversation touches on sensitive topics, handle them with care and suggest seeking professional help if appropriate, while maintaining a supportive stance.
+      - Your goal is to create a meaningful and enriching conversational experience.
+`,
+  model: google("gemini-1.5-pro-latest"),
+  tools: {},
+  // No specific tools for now, focused on conversation
+  memory: new Memory({
+    storage: new UpstashStore(getUpstashOptions()),
+    options: {
+      lastMessages: 10,
+      semanticRecall: false,
+      threads: {
+        generateTitle: false
+      }
+    }
+  })
+});
+
 var z = /*#__PURE__*/Object.freeze({
 	__proto__: null,
 	BRAND: BRAND,
@@ -29797,19 +29841,6 @@ function getWeatherCondition(code) {
   return conditions[code] || "Unknown";
 }
 
-function getUpstashOptions() {
-  if (!process.env.UPSTASH_URL || !process.env.UPSTASH_TOKEN) {
-    throw new Error("UPSTASH_URL and UPSTASH_TOKEN are not set");
-  }
-  return {
-    url: process.env.UPSTASH_URL,
-    token: process.env.UPSTASH_TOKEN
-  };
-}
-function getCorsAllowedOrigins() {
-  return process.env.CORS_ALLOWED_ORIGINS || "http://localhost:3000";
-}
-
 const weatherAgent = new Agent({
   name: "Weather Agent",
   instructions: `
@@ -29817,7 +29848,7 @@ const weatherAgent = new Agent({
 
       Your primary function is to help users get weather details for specific locations. When responding:
       - Try to be helpful and conversational even if the user gets off topic
-      - If the location name isn\u2019t in English, please translate it
+      - If the location name isn't in English, please translate it
       - If giving a location with multiple parts (e.g. "New York, NY"), use the most relevant part (e.g. "New York")
       - Include relevant details like humidity, wind conditions, and precipitation
       - Keep responses concise but informative
@@ -29840,7 +29871,8 @@ const weatherAgent = new Agent({
 
 const mastra = new Mastra({
   agents: {
-    weatherAgent
+    weatherAgent,
+    conversationAgent
   },
   storage: new UpstashStore(getUpstashOptions()),
   logger: createLogger({

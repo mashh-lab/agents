@@ -1,14 +1,12 @@
-# loops-within-loops
+# agents
 
-This project, "loops-within-loops," is a Node.js application built with the Mastra framework. It demonstrates the creation and use of AI agents with specific functionalities, including conversational abilities and tool usage for external data retrieval.
+This is a Node.js application built with the Mastra framework. It demonstrates the creation and use of AI agents with specific functionalities, including conversational abilities and tool usage for external data interactions.
 
 ## Features
 
 - **Mastra Framework:** Leverages the Mastra framework for building and managing AI agents.
 - **Multiple Agents:**
-  - `ConversationAgent`: An AI agent designed for engaging in empathetic and thought-provoking conversations.
-  - `WeatherAgent`: An AI agent that can provide current weather information for a specified location using an external API.
-- **Tool Integration:** The `WeatherAgent` utilizes a custom tool (`weatherTool`) to fetch data from the Open-Meteo API.
+- **Tool Integration:**
 - **Configurable Memory:** Supports different memory backends:
   - Local development: Uses LibSQL for storing conversation history and vector embeddings.
   - Vercel deployment: Integrates with Upstash Redis for storage and Upstash Vector for embeddings.
@@ -64,10 +62,14 @@ This project, "loops-within-loops," is a Node.js application built with the Mast
     pnpm install
     ```
 
-3.  **Set up environment variables:**
+3.  **(OPTIONAL) Set up environment variables for remote resources:**
+
+    **For local development against local resources, you don't need to do anything.**
+
     Create a `.env` file in the root directory by copying `.env.development` and fill in the necessary values.
-    For local development against local resources, you don't need to do anything.
+
     For Upstash/Vercel, you'll need to provide:
+
     - `UPSTASH_REDIS_URL`
     - `UPSTASH_REDIS_TOKEN`
     - `UPSTASH_VECTOR_URL`
@@ -86,7 +88,22 @@ To start the development server:
 pnpm run dev
 ```
 
-This will typically start the Mastra server, and you can interact with the agents based on how Mastra exposes them (likely via HTTP endpoints).
+This will start the local Mastra server and expose the Mastra Playground at http://localhost:4111/agents
+
+### Deploying
+
+You can deploy this application to Vercel by running the following command:
+
+```bash
+pnpm run vercel
+```
+
+This repository is configured for a seamless Vercel deployment workflow:
+
+- **Preview Deployments:** On every push to a branch that is not `main`, Vercel automatically creates a preview deployment. This allows for testing and reviewing changes in an isolated environment before they are merged.
+- **Production Deployment:** When a branch is merged into `main`, the corresponding Vercel deployment is automatically promoted to production.
+
+Ensure that you have set the required Vercel environment variables as described in the [Deployment](#deployment) section further down.
 
 ### Available Scripts
 

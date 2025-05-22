@@ -19038,6 +19038,16 @@ function parseSqlIdentifier(name, kind = "identifier") {
   }
   return name;
 }
+function parseFieldKey(key) {
+  if (!key) throw new Error("Field key cannot be empty");
+  const segments = key.split(".");
+  for (const segment of segments) {
+    if (!SQL_IDENTIFIER_PATTERN.test(segment) || segment.length > 63) {
+      throw new Error(`Invalid field key segment: ${segment} in ${key}`);
+    }
+  }
+  return key;
+}
 
 // src/voice/voice.ts
 var _MastraVoice_decorators, _init$1, _a$1;
@@ -21384,6 +21394,235 @@ var MastraStorage = class extends MastraBase {
       keys: { workflow_name: workflowName, run_id: runId }
     });
     return d ? d.snapshot : null;
+  }
+};
+
+// src/vector/vector.ts
+var MastraVector = class extends MastraBase {
+  constructor() {
+    super({ name: "MastraVector", component: "VECTOR" });
+  }
+  get indexSeparator() {
+    return "_";
+  }
+  async validateExistingIndex(indexName, dimension, metric) {
+    let info;
+    try {
+      info = await this.describeIndex({ indexName });
+    } catch (infoError) {
+      const message = `Index "${indexName}" already exists, but failed to fetch index info for dimension check: ${infoError}`;
+      this.logger?.error(message);
+      throw new Error(message);
+    }
+    const existingDim = info?.dimension;
+    const existingMetric = info?.metric;
+    if (existingDim === dimension) {
+      this.logger?.info(
+        `Index "${indexName}" already exists with ${existingDim} dimensions and metric ${existingMetric}, skipping creation.`
+      );
+      if (existingMetric !== metric) {
+        this.logger?.warn(
+          `Attempted to create index with metric "${metric}", but index already exists with metric "${existingMetric}". To use a different metric, delete and recreate the index.`
+        );
+      }
+    } else if (info) {
+      const message = `Index "${indexName}" already exists with ${existingDim} dimensions, but ${dimension} dimensions were requested`;
+      this.logger?.error(message);
+      throw new Error(message);
+    } else {
+      const message = `Index "${indexName}" already exists, but could not retrieve its dimensions for validation.`;
+      this.logger?.error(message);
+      throw new Error(message);
+    }
+  }
+};
+
+// src/vector/filter/base.ts
+var BaseFilterTranslator = class _BaseFilterTranslator {
+  /**
+   * Operator type checks
+   */
+  isOperator(key) {
+    return key.startsWith("$");
+  }
+  static BASIC_OPERATORS = ["$eq", "$ne"];
+  static NUMERIC_OPERATORS = ["$gt", "$gte", "$lt", "$lte"];
+  static ARRAY_OPERATORS = ["$in", "$nin", "$all", "$elemMatch"];
+  static LOGICAL_OPERATORS = ["$and", "$or", "$not", "$nor"];
+  static ELEMENT_OPERATORS = ["$exists"];
+  static REGEX_OPERATORS = ["$regex", "$options"];
+  static DEFAULT_OPERATORS = {
+    logical: _BaseFilterTranslator.LOGICAL_OPERATORS,
+    basic: _BaseFilterTranslator.BASIC_OPERATORS,
+    numeric: _BaseFilterTranslator.NUMERIC_OPERATORS,
+    array: _BaseFilterTranslator.ARRAY_OPERATORS,
+    element: _BaseFilterTranslator.ELEMENT_OPERATORS,
+    regex: _BaseFilterTranslator.REGEX_OPERATORS
+  };
+  isLogicalOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.logical.includes(key);
+  }
+  isBasicOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.basic.includes(key);
+  }
+  isNumericOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.numeric.includes(key);
+  }
+  isArrayOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.array.includes(key);
+  }
+  isElementOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.element.includes(key);
+  }
+  isRegexOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.regex.includes(key);
+  }
+  isFieldOperator(key) {
+    return this.isOperator(key) && !this.isLogicalOperator(key);
+  }
+  isCustomOperator(key) {
+    const support = this.getSupportedOperators();
+    return support.custom?.includes(key) ?? false;
+  }
+  getSupportedOperators() {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS;
+  }
+  isValidOperator(key) {
+    const support = this.getSupportedOperators();
+    const allSupported = Object.values(support).flat();
+    return allSupported.includes(key);
+  }
+  /**
+   * Value normalization for comparison operators
+   */
+  normalizeComparisonValue(value) {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    if (typeof value === "number" && Object.is(value, -0)) {
+      return 0;
+    }
+    return value;
+  }
+  /**
+   * Helper method to simulate $all operator using $and + $eq when needed.
+   * Some vector stores don't support $all natively.
+   */
+  simulateAllOperator(field, values) {
+    return {
+      $and: values.map((value) => ({
+        [field]: { $in: [this.normalizeComparisonValue(value)] }
+      }))
+    };
+  }
+  /**
+   * Utility functions for type checking
+   */
+  isPrimitive(value) {
+    return value === null || value === void 0 || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+  }
+  isRegex(value) {
+    return value instanceof RegExp;
+  }
+  isEmpty(obj) {
+    return obj === null || obj === void 0 || typeof obj === "object" && Object.keys(obj).length === 0;
+  }
+  static ErrorMessages = {
+    UNSUPPORTED_OPERATOR: (op) => `Unsupported operator: ${op}`,
+    INVALID_LOGICAL_OPERATOR_LOCATION: (op, path) => `Logical operator ${op} cannot be used at field level: ${path}`,
+    NOT_REQUIRES_OBJECT: `$not operator requires an object`,
+    NOT_CANNOT_BE_EMPTY: `$not operator cannot be empty`,
+    INVALID_LOGICAL_OPERATOR_CONTENT: (path) => `Logical operators must contain field conditions, not direct operators: ${path}`,
+    INVALID_TOP_LEVEL_OPERATOR: (op) => `Invalid top-level operator: ${op}`,
+    ELEM_MATCH_REQUIRES_OBJECT: `$elemMatch requires an object with conditions`
+  };
+  /**
+   * Helper to handle array value normalization consistently
+   */
+  normalizeArrayValues(values) {
+    return values.map((value) => this.normalizeComparisonValue(value));
+  }
+  validateFilter(filter) {
+    const validation = this.validateFilterSupport(filter);
+    if (!validation.supported) {
+      throw new Error(validation.messages.join(", "));
+    }
+  }
+  /**
+   * Validates if a filter structure is supported by the specific vector DB
+   * and returns detailed validation information.
+   */
+  validateFilterSupport(node, path = "") {
+    const messages = [];
+    if (this.isPrimitive(node) || this.isEmpty(node)) {
+      return { supported: true, messages: [] };
+    }
+    if (Array.isArray(node)) {
+      const arrayResults = node.map((item) => this.validateFilterSupport(item, path));
+      const arrayMessages = arrayResults.flatMap((r) => r.messages);
+      return {
+        supported: arrayResults.every((r) => r.supported),
+        messages: arrayMessages
+      };
+    }
+    const nodeObj = node;
+    let isSupported = true;
+    for (const [key, value] of Object.entries(nodeObj)) {
+      const newPath = path ? `${path}.${key}` : key;
+      if (this.isOperator(key)) {
+        if (!this.isValidOperator(key)) {
+          isSupported = false;
+          messages.push(_BaseFilterTranslator.ErrorMessages.UNSUPPORTED_OPERATOR(key));
+          continue;
+        }
+        if (!path && !this.isLogicalOperator(key)) {
+          isSupported = false;
+          messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_TOP_LEVEL_OPERATOR(key));
+          continue;
+        }
+        if (key === "$elemMatch" && (typeof value !== "object" || Array.isArray(value))) {
+          isSupported = false;
+          messages.push(_BaseFilterTranslator.ErrorMessages.ELEM_MATCH_REQUIRES_OBJECT);
+          continue;
+        }
+        if (this.isLogicalOperator(key)) {
+          if (key === "$not") {
+            if (Array.isArray(value) || typeof value !== "object") {
+              isSupported = false;
+              messages.push(_BaseFilterTranslator.ErrorMessages.NOT_REQUIRES_OBJECT);
+              continue;
+            }
+            if (this.isEmpty(value)) {
+              isSupported = false;
+              messages.push(_BaseFilterTranslator.ErrorMessages.NOT_CANNOT_BE_EMPTY);
+              continue;
+            }
+            continue;
+          }
+          if (path && !this.isLogicalOperator(path.split(".").pop())) {
+            isSupported = false;
+            messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_LOGICAL_OPERATOR_LOCATION(key, newPath));
+            continue;
+          }
+          if (Array.isArray(value)) {
+            const hasDirectOperators = value.some(
+              (item) => typeof item === "object" && Object.keys(item).length === 1 && this.isFieldOperator(Object.keys(item)[0])
+            );
+            if (hasDirectOperators) {
+              isSupported = false;
+              messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_LOGICAL_OPERATOR_CONTENT(newPath));
+              continue;
+            }
+          }
+        }
+      }
+      const nestedValidation = this.validateFilterSupport(value, newPath);
+      if (!nestedValidation.supported) {
+        isSupported = false;
+        messages.push(...nestedValidation.messages);
+      }
+    }
+    return { supported: isSupported, messages };
   }
 };
 
@@ -26895,46 +27134,6 @@ var Redis2 = class _Redis extends Redis {
   }
 };
 
-// src/vector/vector.ts
-var MastraVector = class extends MastraBase {
-  constructor() {
-    super({ name: "MastraVector", component: "VECTOR" });
-  }
-  get indexSeparator() {
-    return "_";
-  }
-  async validateExistingIndex(indexName, dimension, metric) {
-    let info;
-    try {
-      info = await this.describeIndex({ indexName });
-    } catch (infoError) {
-      const message = `Index "${indexName}" already exists, but failed to fetch index info for dimension check: ${infoError}`;
-      this.logger?.error(message);
-      throw new Error(message);
-    }
-    const existingDim = info?.dimension;
-    const existingMetric = info?.metric;
-    if (existingDim === dimension) {
-      this.logger?.info(
-        `Index "${indexName}" already exists with ${existingDim} dimensions and metric ${existingMetric}, skipping creation.`
-      );
-      if (existingMetric !== metric) {
-        this.logger?.warn(
-          `Attempted to create index with metric "${metric}", but index already exists with metric "${existingMetric}". To use a different metric, delete and recreate the index.`
-        );
-      }
-    } else if (info) {
-      const message = `Index "${indexName}" already exists with ${existingDim} dimensions, but ${dimension} dimensions were requested`;
-      this.logger?.error(message);
-      throw new Error(message);
-    } else {
-      const message = `Index "${indexName}" already exists, but could not retrieve its dimensions for validation.`;
-      this.logger?.error(message);
-      throw new Error(message);
-    }
-  }
-};
-
 // src/error/index.ts
 var UpstashError = class extends Error {
   constructor(message) {
@@ -27840,195 +28039,6 @@ var Index2 = class _Index extends Index {
       throw new Error("Unable to find environment variable: `UPSTASH_VECTOR_REST_TOKEN`");
     }
     return new _Index({ ...config, url, token });
-  }
-};
-
-// src/vector/filter/base.ts
-var BaseFilterTranslator = class _BaseFilterTranslator {
-  /**
-   * Operator type checks
-   */
-  isOperator(key) {
-    return key.startsWith("$");
-  }
-  static BASIC_OPERATORS = ["$eq", "$ne"];
-  static NUMERIC_OPERATORS = ["$gt", "$gte", "$lt", "$lte"];
-  static ARRAY_OPERATORS = ["$in", "$nin", "$all", "$elemMatch"];
-  static LOGICAL_OPERATORS = ["$and", "$or", "$not", "$nor"];
-  static ELEMENT_OPERATORS = ["$exists"];
-  static REGEX_OPERATORS = ["$regex", "$options"];
-  static DEFAULT_OPERATORS = {
-    logical: _BaseFilterTranslator.LOGICAL_OPERATORS,
-    basic: _BaseFilterTranslator.BASIC_OPERATORS,
-    numeric: _BaseFilterTranslator.NUMERIC_OPERATORS,
-    array: _BaseFilterTranslator.ARRAY_OPERATORS,
-    element: _BaseFilterTranslator.ELEMENT_OPERATORS,
-    regex: _BaseFilterTranslator.REGEX_OPERATORS
-  };
-  isLogicalOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.logical.includes(key);
-  }
-  isBasicOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.basic.includes(key);
-  }
-  isNumericOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.numeric.includes(key);
-  }
-  isArrayOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.array.includes(key);
-  }
-  isElementOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.element.includes(key);
-  }
-  isRegexOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.regex.includes(key);
-  }
-  isFieldOperator(key) {
-    return this.isOperator(key) && !this.isLogicalOperator(key);
-  }
-  isCustomOperator(key) {
-    const support = this.getSupportedOperators();
-    return support.custom?.includes(key) ?? false;
-  }
-  getSupportedOperators() {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS;
-  }
-  isValidOperator(key) {
-    const support = this.getSupportedOperators();
-    const allSupported = Object.values(support).flat();
-    return allSupported.includes(key);
-  }
-  /**
-   * Value normalization for comparison operators
-   */
-  normalizeComparisonValue(value) {
-    if (value instanceof Date) {
-      return value.toISOString();
-    }
-    if (typeof value === "number" && Object.is(value, -0)) {
-      return 0;
-    }
-    return value;
-  }
-  /**
-   * Helper method to simulate $all operator using $and + $eq when needed.
-   * Some vector stores don't support $all natively.
-   */
-  simulateAllOperator(field, values) {
-    return {
-      $and: values.map((value) => ({
-        [field]: { $in: [this.normalizeComparisonValue(value)] }
-      }))
-    };
-  }
-  /**
-   * Utility functions for type checking
-   */
-  isPrimitive(value) {
-    return value === null || value === void 0 || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
-  }
-  isRegex(value) {
-    return value instanceof RegExp;
-  }
-  isEmpty(obj) {
-    return obj === null || obj === void 0 || typeof obj === "object" && Object.keys(obj).length === 0;
-  }
-  static ErrorMessages = {
-    UNSUPPORTED_OPERATOR: (op) => `Unsupported operator: ${op}`,
-    INVALID_LOGICAL_OPERATOR_LOCATION: (op, path) => `Logical operator ${op} cannot be used at field level: ${path}`,
-    NOT_REQUIRES_OBJECT: `$not operator requires an object`,
-    NOT_CANNOT_BE_EMPTY: `$not operator cannot be empty`,
-    INVALID_LOGICAL_OPERATOR_CONTENT: (path) => `Logical operators must contain field conditions, not direct operators: ${path}`,
-    INVALID_TOP_LEVEL_OPERATOR: (op) => `Invalid top-level operator: ${op}`,
-    ELEM_MATCH_REQUIRES_OBJECT: `$elemMatch requires an object with conditions`
-  };
-  /**
-   * Helper to handle array value normalization consistently
-   */
-  normalizeArrayValues(values) {
-    return values.map((value) => this.normalizeComparisonValue(value));
-  }
-  validateFilter(filter) {
-    const validation = this.validateFilterSupport(filter);
-    if (!validation.supported) {
-      throw new Error(validation.messages.join(", "));
-    }
-  }
-  /**
-   * Validates if a filter structure is supported by the specific vector DB
-   * and returns detailed validation information.
-   */
-  validateFilterSupport(node, path = "") {
-    const messages = [];
-    if (this.isPrimitive(node) || this.isEmpty(node)) {
-      return { supported: true, messages: [] };
-    }
-    if (Array.isArray(node)) {
-      const arrayResults = node.map((item) => this.validateFilterSupport(item, path));
-      const arrayMessages = arrayResults.flatMap((r) => r.messages);
-      return {
-        supported: arrayResults.every((r) => r.supported),
-        messages: arrayMessages
-      };
-    }
-    const nodeObj = node;
-    let isSupported = true;
-    for (const [key, value] of Object.entries(nodeObj)) {
-      const newPath = path ? `${path}.${key}` : key;
-      if (this.isOperator(key)) {
-        if (!this.isValidOperator(key)) {
-          isSupported = false;
-          messages.push(_BaseFilterTranslator.ErrorMessages.UNSUPPORTED_OPERATOR(key));
-          continue;
-        }
-        if (!path && !this.isLogicalOperator(key)) {
-          isSupported = false;
-          messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_TOP_LEVEL_OPERATOR(key));
-          continue;
-        }
-        if (key === "$elemMatch" && (typeof value !== "object" || Array.isArray(value))) {
-          isSupported = false;
-          messages.push(_BaseFilterTranslator.ErrorMessages.ELEM_MATCH_REQUIRES_OBJECT);
-          continue;
-        }
-        if (this.isLogicalOperator(key)) {
-          if (key === "$not") {
-            if (Array.isArray(value) || typeof value !== "object") {
-              isSupported = false;
-              messages.push(_BaseFilterTranslator.ErrorMessages.NOT_REQUIRES_OBJECT);
-              continue;
-            }
-            if (this.isEmpty(value)) {
-              isSupported = false;
-              messages.push(_BaseFilterTranslator.ErrorMessages.NOT_CANNOT_BE_EMPTY);
-              continue;
-            }
-            continue;
-          }
-          if (path && !this.isLogicalOperator(path.split(".").pop())) {
-            isSupported = false;
-            messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_LOGICAL_OPERATOR_LOCATION(key, newPath));
-            continue;
-          }
-          if (Array.isArray(value)) {
-            const hasDirectOperators = value.some(
-              (item) => typeof item === "object" && Object.keys(item).length === 1 && this.isFieldOperator(Object.keys(item)[0])
-            );
-            if (hasDirectOperators) {
-              isSupported = false;
-              messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_LOGICAL_OPERATOR_CONTENT(newPath));
-              continue;
-            }
-          }
-        }
-      }
-      const nestedValidation = this.validateFilterSupport(value, newPath);
-      if (!nestedValidation.supported) {
-        isSupported = false;
-        messages.push(...nestedValidation.messages);
-      }
-    }
-    return { supported: isSupported, messages };
   }
 };
 
@@ -29620,6 +29630,764 @@ Notes:
   }
 };
 
+// src/vector/index.ts
+var LibSQLFilterTranslator = class extends BaseFilterTranslator {
+  getSupportedOperators() {
+    return {
+      ...BaseFilterTranslator.DEFAULT_OPERATORS,
+      regex: [],
+      custom: ["$contains", "$size"]
+    };
+  }
+  translate(filter) {
+    if (this.isEmpty(filter)) {
+      return filter;
+    }
+    this.validateFilter(filter);
+    return this.translateNode(filter);
+  }
+  translateNode(node, currentPath = "") {
+    if (this.isRegex(node)) {
+      throw new Error("Direct regex pattern format is not supported in LibSQL");
+    }
+    const withPath = (result2) => currentPath ? { [currentPath]: result2 } : result2;
+    if (this.isPrimitive(node)) {
+      return withPath({ $eq: this.normalizeComparisonValue(node) });
+    }
+    if (Array.isArray(node)) {
+      return withPath({ $in: this.normalizeArrayValues(node) });
+    }
+    const entries = Object.entries(node);
+    const result = {};
+    for (const [key, value] of entries) {
+      const newPath = currentPath ? `${currentPath}.${key}` : key;
+      if (this.isLogicalOperator(key)) {
+        result[key] = Array.isArray(value) ? value.map((filter) => this.translateNode(filter)) : this.translateNode(value);
+      } else if (this.isOperator(key)) {
+        if (this.isArrayOperator(key) && !Array.isArray(value) && key !== "$elemMatch") {
+          result[key] = [value];
+        } else if (this.isBasicOperator(key) && Array.isArray(value)) {
+          result[key] = JSON.stringify(value);
+        } else {
+          result[key] = value;
+        }
+      } else if (typeof value === "object" && value !== null) {
+        const hasOperators = Object.keys(value).some((k) => this.isOperator(k));
+        if (hasOperators) {
+          result[newPath] = this.translateNode(value);
+        } else {
+          Object.assign(result, this.translateNode(value, newPath));
+        }
+      } else {
+        result[newPath] = this.translateNode(value);
+      }
+    }
+    return result;
+  }
+  // TODO: Look more into regex support for LibSQL
+  // private translateRegexPattern(pattern: string, options: string = ''): any {
+  //   if (!options) return { $regex: pattern };
+  //   const flags = options
+  //     .split('')
+  //     .filter(f => 'imsux'.includes(f))
+  //     .join('');
+  //   return {
+  //     $regex: pattern,
+  //     $options: flags,
+  //   };
+  // }
+};
+var createBasicOperator = (symbol) => {
+  return (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    return {
+      sql: `CASE 
+        WHEN ? IS NULL THEN json_extract(metadata, '$."${jsonPathKey}"') IS ${symbol === "=" ? "" : "NOT"} NULL
+        ELSE json_extract(metadata, '$."${jsonPathKey}"') ${symbol} ?
+      END`,
+      needsValue: true,
+      transformValue: () => {
+        return [value, value];
+      }
+    };
+  };
+};
+var createNumericOperator = (symbol) => {
+  return (key) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    return {
+      sql: `CAST(json_extract(metadata, '$."${jsonPathKey}"') AS NUMERIC) ${symbol} ?`,
+      needsValue: true
+    };
+  };
+};
+var validateJsonArray = (key) => `json_valid(json_extract(metadata, '$."${key}"'))
+   AND json_type(json_extract(metadata, '$."${key}"')) = 'array'`;
+var pattern = /json_extract\(metadata, '\$\."[^"]*"(\."[^"]*")*'\)/g;
+function buildElemMatchConditions(value) {
+  const conditions = Object.entries(value).map(([field, fieldValue]) => {
+    if (field.startsWith("$")) {
+      const { sql, values } = buildCondition("elem.value", { [field]: fieldValue });
+      const elemSql = sql.replace(pattern, "elem.value");
+      return { sql: elemSql, values };
+    } else if (typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
+      const { sql, values } = buildCondition(field, fieldValue);
+      const elemSql = sql.replace(pattern, `json_extract(elem.value, '$."${field}"')`);
+      return { sql: elemSql, values };
+    } else {
+      const parsedFieldKey = parseFieldKey(field);
+      return {
+        sql: `json_extract(elem.value, '$."${parsedFieldKey}"') = ?`,
+        values: [fieldValue]
+      };
+    }
+  });
+  return conditions;
+}
+var FILTER_OPERATORS = {
+  $eq: createBasicOperator("="),
+  $ne: createBasicOperator("!="),
+  $gt: createNumericOperator(">"),
+  $gte: createNumericOperator(">="),
+  $lt: createNumericOperator("<"),
+  $lte: createNumericOperator("<="),
+  // Array Operators
+  $in: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    const arr = Array.isArray(value) ? value : [value];
+    if (arr.length === 0) {
+      return { sql: "1 = 0", needsValue: true, transformValue: () => [] };
+    }
+    const paramPlaceholders = arr.map(() => "?").join(",");
+    return {
+      sql: `(
+      CASE
+        WHEN ${validateJsonArray(jsonPathKey)} THEN
+          EXISTS (
+            SELECT 1 FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
+            WHERE elem.value IN (SELECT value FROM json_each(?))
+          )
+        ELSE json_extract(metadata, '$."${jsonPathKey}"') IN (${paramPlaceholders})
+      END
+    )`,
+      needsValue: true,
+      transformValue: () => [JSON.stringify(arr), ...arr]
+    };
+  },
+  $nin: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    const arr = Array.isArray(value) ? value : [value];
+    if (arr.length === 0) {
+      return { sql: "1 = 1", needsValue: true, transformValue: () => [] };
+    }
+    const paramPlaceholders = arr.map(() => "?").join(",");
+    return {
+      sql: `(
+      CASE
+        WHEN ${validateJsonArray(jsonPathKey)} THEN
+          NOT EXISTS (
+            SELECT 1 FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
+            WHERE elem.value IN (SELECT value FROM json_each(?))
+          )
+        ELSE json_extract(metadata, '$."${jsonPathKey}"') NOT IN (${paramPlaceholders})
+      END
+    )`,
+      needsValue: true,
+      transformValue: () => [JSON.stringify(arr), ...arr]
+    };
+  },
+  $all: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    let sql;
+    const arrayValue = Array.isArray(value) ? value : [value];
+    if (arrayValue.length === 0) {
+      sql = "1 = 0";
+    } else {
+      sql = `(
+      CASE
+        WHEN ${validateJsonArray(jsonPathKey)} THEN
+          NOT EXISTS (
+            SELECT value
+            FROM json_each(?)
+            WHERE value NOT IN (
+              SELECT value
+              FROM json_each(json_extract(metadata, '$."${jsonPathKey}"'))
+            )
+          )
+        ELSE FALSE
+      END
+    )`;
+    }
+    return {
+      sql,
+      needsValue: true,
+      transformValue: () => {
+        if (arrayValue.length === 0) {
+          return [];
+        }
+        return [JSON.stringify(arrayValue)];
+      }
+    };
+  },
+  $elemMatch: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    if (typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("$elemMatch requires an object with conditions");
+    }
+    const conditions = buildElemMatchConditions(value);
+    return {
+      sql: `(
+        CASE
+          WHEN ${validateJsonArray(jsonPathKey)} THEN
+            EXISTS (
+              SELECT 1
+              FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
+              WHERE ${conditions.map((c) => c.sql).join(" AND ")}
+            )
+          ELSE FALSE
+        END
+      )`,
+      needsValue: true,
+      transformValue: () => conditions.flatMap((c) => c.values)
+    };
+  },
+  // Element Operators
+  $exists: (key) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    return {
+      sql: `json_extract(metadata, '$."${jsonPathKey}"') IS NOT NULL`,
+      needsValue: false
+    };
+  },
+  // Logical Operators
+  $and: (key) => ({
+    sql: `(${key})`,
+    needsValue: false
+  }),
+  $or: (key) => ({
+    sql: `(${key})`,
+    needsValue: false
+  }),
+  $not: (key) => ({ sql: `NOT (${key})`, needsValue: false }),
+  $nor: (key) => ({
+    sql: `NOT (${key})`,
+    needsValue: false
+  }),
+  $size: (key, paramIndex) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    return {
+      sql: `(
+    CASE
+      WHEN json_type(json_extract(metadata, '$."${jsonPathKey}"')) = 'array' THEN 
+        json_array_length(json_extract(metadata, '$."${jsonPathKey}"')) = $${paramIndex}
+      ELSE FALSE
+    END
+  )`,
+      needsValue: true
+    };
+  },
+  //   /**
+  //    * Regex Operators
+  //    * Supports case insensitive and multiline
+  //    */
+  //   $regex: (key: string): FilterOperator => ({
+  //     sql: `json_extract(metadata, '$."${toJsonPathKey(key)}"') = ?`,
+  //     needsValue: true,
+  //     transformValue: (value: any) => {
+  //       const pattern = typeof value === 'object' ? value.$regex : value;
+  //       const options = typeof value === 'object' ? value.$options || '' : '';
+  //       let sql = `json_extract(metadata, '$."${toJsonPathKey(key)}"')`;
+  //       // Handle multiline
+  //       //   if (options.includes('m')) {
+  //       //     sql = `REPLACE(${sql}, CHAR(10), '\n')`;
+  //       //   }
+  //       //       let finalPattern = pattern;
+  //       // if (options) {
+  //       //   finalPattern = `(\\?${options})${pattern}`;
+  //       // }
+  //       //   // Handle case insensitivity
+  //       //   if (options.includes('i')) {
+  //       //     sql = `LOWER(${sql}) REGEXP LOWER(?)`;
+  //       //   } else {
+  //       //     sql = `${sql} REGEXP ?`;
+  //       //   }
+  //       if (options.includes('m')) {
+  //         sql = `EXISTS (
+  //         SELECT 1
+  //         FROM json_each(
+  //           json_array(
+  //             ${sql},
+  //             REPLACE(${sql}, CHAR(10), CHAR(13))
+  //           )
+  //         ) as lines
+  //         WHERE lines.value REGEXP ?
+  //       )`;
+  //       } else {
+  //         sql = `${sql} REGEXP ?`;
+  //       }
+  //       // Handle case insensitivity
+  //       if (options.includes('i')) {
+  //         sql = sql.replace('REGEXP ?', 'REGEXP LOWER(?)');
+  //         sql = sql.replace('value REGEXP', 'LOWER(value) REGEXP');
+  //       }
+  //       // Handle extended - allows whitespace and comments in pattern
+  //       if (options.includes('x')) {
+  //         // Remove whitespace and comments from pattern
+  //         const cleanPattern = pattern.replace(/\s+|#.*$/gm, '');
+  //         return {
+  //           sql,
+  //           values: [cleanPattern],
+  //         };
+  //       }
+  //       return {
+  //         sql,
+  //         values: [pattern],
+  //       };
+  //     },
+  //   }),
+  $contains: (key, value) => {
+    const jsonPathKey = parseJsonPathKey(key);
+    let sql;
+    if (Array.isArray(value)) {
+      sql = `(
+        SELECT ${validateJsonArray(jsonPathKey)}
+        AND EXISTS (
+          SELECT 1
+          FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as m
+          WHERE m.value IN (SELECT value FROM json_each(?))
+        )
+      )`;
+    } else if (typeof value === "string") {
+      sql = `lower(json_extract(metadata, '$."${jsonPathKey}"')) LIKE '%' || lower(?) || '%' ESCAPE '\\'`;
+    } else {
+      sql = `json_extract(metadata, '$."${jsonPathKey}"') = ?`;
+    }
+    return {
+      sql,
+      needsValue: true,
+      transformValue: () => {
+        if (Array.isArray(value)) {
+          return [JSON.stringify(value)];
+        }
+        if (typeof value === "object" && value !== null) {
+          return [JSON.stringify(value)];
+        }
+        if (typeof value === "string") {
+          return [escapeLikePattern(value)];
+        }
+        return [value];
+      }
+    };
+  }
+  /**
+   * $objectContains: True JSON containment for advanced use (deep sub-object match).
+   * Usage: { field: { $objectContains: { ...subobject } } }
+   */
+  // $objectContains: (key: string) => ({
+  //   sql: '', // Will be overridden by transformValue
+  //   needsValue: true,
+  //   transformValue: (value: any) => ({
+  //     sql: `json_type(json_extract(metadata, '$."${toJsonPathKey(key)}"')) = 'object'
+  //         AND json_patch(json_extract(metadata, '$."${toJsonPathKey(key)}"'), ?) = json_extract(metadata, '$."${toJsonPathKey(key)}"')`,
+  //     values: [JSON.stringify(value)],
+  //   }),
+  // }),
+};
+function isFilterResult(obj) {
+  return obj && typeof obj === "object" && typeof obj.sql === "string" && Array.isArray(obj.values);
+}
+var parseJsonPathKey = (key) => {
+  const parsedKey = parseFieldKey(key);
+  return parsedKey.replace(/\./g, '"."');
+};
+function escapeLikePattern(str) {
+  return str.replace(/([%_\\])/g, "\\$1");
+}
+function buildFilterQuery(filter) {
+  if (!filter) {
+    return { sql: "", values: [] };
+  }
+  const values = [];
+  const conditions = Object.entries(filter).map(([key, value]) => {
+    const condition = buildCondition(key, value);
+    values.push(...condition.values);
+    return condition.sql;
+  }).join(" AND ");
+  return {
+    sql: conditions ? `WHERE ${conditions}` : "",
+    values
+  };
+}
+function buildCondition(key, value, parentPath) {
+  if (["$and", "$or", "$not", "$nor"].includes(key)) {
+    return handleLogicalOperator(key, value);
+  }
+  if (!value || typeof value !== "object") {
+    return {
+      sql: `json_extract(metadata, '$."${key.replace(/\./g, '"."')}"') = ?`,
+      values: [value]
+    };
+  }
+  return handleOperator(key, value);
+}
+function handleLogicalOperator(key, value, parentPath) {
+  if (!value || value.length === 0) {
+    switch (key) {
+      case "$and":
+      case "$nor":
+        return { sql: "true", values: [] };
+      case "$or":
+        return { sql: "false", values: [] };
+      case "$not":
+        throw new Error("$not operator cannot be empty");
+      default:
+        return { sql: "true", values: [] };
+    }
+  }
+  if (key === "$not") {
+    const entries = Object.entries(value);
+    const conditions2 = entries.map(([fieldKey, fieldValue]) => buildCondition(fieldKey, fieldValue));
+    return {
+      sql: `NOT (${conditions2.map((c) => c.sql).join(" AND ")})`,
+      values: conditions2.flatMap((c) => c.values)
+    };
+  }
+  const values = [];
+  const joinOperator = key === "$or" || key === "$nor" ? "OR" : "AND";
+  const conditions = Array.isArray(value) ? value.map((f) => {
+    const entries = Object.entries(f);
+    return entries.map(([k, v]) => buildCondition(k, v));
+  }) : [buildCondition(key, value)];
+  const joined = conditions.flat().map((c) => {
+    values.push(...c.values);
+    return c.sql;
+  }).join(` ${joinOperator} `);
+  return {
+    sql: key === "$nor" ? `NOT (${joined})` : `(${joined})`,
+    values
+  };
+}
+function handleOperator(key, value) {
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const entries = Object.entries(value);
+    const results = entries.map(
+      ([operator2, operatorValue2]) => operator2 === "$not" ? {
+        sql: `NOT (${Object.entries(operatorValue2).map(([op, val]) => processOperator(key, op, val).sql).join(" AND ")})`,
+        values: Object.entries(operatorValue2).flatMap(
+          ([op, val]) => processOperator(key, op, val).values
+        )
+      } : processOperator(key, operator2, operatorValue2)
+    );
+    return {
+      sql: `(${results.map((r) => r.sql).join(" AND ")})`,
+      values: results.flatMap((r) => r.values)
+    };
+  }
+  const [[operator, operatorValue] = []] = Object.entries(value);
+  return processOperator(key, operator, operatorValue);
+}
+var processOperator = (key, operator, operatorValue) => {
+  if (!operator.startsWith("$") || !FILTER_OPERATORS[operator]) {
+    throw new Error(`Invalid operator: ${operator}`);
+  }
+  const operatorFn = FILTER_OPERATORS[operator];
+  const operatorResult = operatorFn(key, operatorValue);
+  if (!operatorResult.needsValue) {
+    return { sql: operatorResult.sql, values: [] };
+  }
+  const transformed = operatorResult.transformValue ? operatorResult.transformValue() : operatorValue;
+  if (isFilterResult(transformed)) {
+    return transformed;
+  }
+  return {
+    sql: operatorResult.sql,
+    values: Array.isArray(transformed) ? transformed : [transformed]
+  };
+};
+
+// src/vector/index.ts
+var LibSQLVector = class extends MastraVector {
+  turso;
+  constructor({
+    connectionUrl,
+    authToken,
+    syncUrl,
+    syncInterval
+  }) {
+    super();
+    this.turso = createClient({
+      url: connectionUrl,
+      syncUrl,
+      authToken,
+      syncInterval
+    });
+    if (connectionUrl.includes(`file:`) || connectionUrl.includes(`:memory:`)) {
+      void this.turso.execute({
+        sql: "PRAGMA journal_mode=WAL;",
+        args: {}
+      });
+    }
+  }
+  transformFilter(filter) {
+    const translator = new LibSQLFilterTranslator();
+    return translator.translate(filter);
+  }
+  async query({
+    indexName,
+    queryVector,
+    topK = 10,
+    filter,
+    includeVector = false,
+    minScore = 0
+  }) {
+    try {
+      if (!Number.isInteger(topK) || topK <= 0) {
+        throw new Error("topK must be a positive integer");
+      }
+      if (!Array.isArray(queryVector) || !queryVector.every((x) => typeof x === "number" && Number.isFinite(x))) {
+        throw new Error("queryVector must be an array of finite numbers");
+      }
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      const vectorStr = `[${queryVector.join(",")}]`;
+      const translatedFilter = this.transformFilter(filter);
+      const { sql: filterQuery, values: filterValues } = buildFilterQuery(translatedFilter);
+      filterValues.push(minScore);
+      filterValues.push(topK);
+      const query = `
+        WITH vector_scores AS (
+          SELECT
+            vector_id as id,
+            (1-vector_distance_cos(embedding, '${vectorStr}')) as score,
+            metadata
+            ${includeVector ? ", vector_extract(embedding) as embedding" : ""}
+          FROM ${parsedIndexName}
+          ${filterQuery}
+        )
+        SELECT *
+        FROM vector_scores
+        WHERE score > ?
+        ORDER BY score DESC
+        LIMIT ?`;
+      const result = await this.turso.execute({
+        sql: query,
+        args: filterValues
+      });
+      return result.rows.map(({ id, score, metadata, embedding }) => ({
+        id,
+        score,
+        metadata: JSON.parse(metadata ?? "{}"),
+        ...includeVector && embedding && { vector: JSON.parse(embedding) }
+      }));
+    } finally {
+    }
+  }
+  async upsert({ indexName, vectors, metadata, ids }) {
+    const tx = await this.turso.transaction("write");
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      const vectorIds = ids || vectors.map(() => crypto.randomUUID());
+      for (let i = 0; i < vectors.length; i++) {
+        const query = `
+          INSERT INTO ${parsedIndexName} (vector_id, embedding, metadata)
+          VALUES (?, vector32(?), ?)
+          ON CONFLICT(vector_id) DO UPDATE SET
+            embedding = vector32(?),
+            metadata = ?
+        `;
+        await tx.execute({
+          sql: query,
+          // @ts-ignore
+          args: [
+            vectorIds[i],
+            JSON.stringify(vectors[i]),
+            JSON.stringify(metadata?.[i] || {}),
+            JSON.stringify(vectors[i]),
+            JSON.stringify(metadata?.[i] || {})
+          ]
+        });
+      }
+      await tx.commit();
+      return vectorIds;
+    } catch (error) {
+      await tx.rollback();
+      if (error instanceof Error && error.message?.includes("dimensions are different")) {
+        const match = error.message.match(/dimensions are different: (\d+) != (\d+)/);
+        if (match) {
+          const [, actual, expected] = match;
+          throw new Error(
+            `Vector dimension mismatch: Index "${indexName}" expects ${expected} dimensions but got ${actual} dimensions. Either use a matching embedding model or delete and recreate the index with the new dimension.`
+          );
+        }
+      }
+      throw error;
+    }
+  }
+  async createIndex({ indexName, dimension }) {
+    try {
+      if (!Number.isInteger(dimension) || dimension <= 0) {
+        throw new Error("Dimension must be a positive integer");
+      }
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      await this.turso.execute({
+        sql: `
+        CREATE TABLE IF NOT EXISTS ${parsedIndexName} (
+          id SERIAL PRIMARY KEY,
+          vector_id TEXT UNIQUE NOT NULL,
+          embedding F32_BLOB(${dimension}),
+          metadata TEXT DEFAULT '{}'
+        );
+      `,
+        args: []
+      });
+      await this.turso.execute({
+        sql: `
+        CREATE INDEX IF NOT EXISTS ${parsedIndexName}_vector_idx
+        ON ${parsedIndexName} (libsql_vector_idx(embedding))
+      `,
+        args: []
+      });
+    } catch (error) {
+      console.error("Failed to create vector table:", error);
+      throw error;
+    } finally {
+    }
+  }
+  async deleteIndex({ indexName }) {
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      await this.turso.execute({
+        sql: `DROP TABLE IF EXISTS ${parsedIndexName}`,
+        args: []
+      });
+    } catch (error) {
+      console.error("Failed to delete vector table:", error);
+      throw new Error(`Failed to delete vector table: ${error.message}`);
+    } finally {
+    }
+  }
+  async listIndexes() {
+    try {
+      const vectorTablesQuery = `
+        SELECT name FROM sqlite_master 
+        WHERE type='table' 
+        AND sql LIKE '%F32_BLOB%';
+      `;
+      const result = await this.turso.execute({
+        sql: vectorTablesQuery,
+        args: []
+      });
+      return result.rows.map((row) => row.name);
+    } catch (error) {
+      throw new Error(`Failed to list vector tables: ${error.message}`);
+    }
+  }
+  /**
+   * Retrieves statistics about a vector index.
+   *
+   * @param {string} indexName - The name of the index to describe
+   * @returns A promise that resolves to the index statistics including dimension, count and metric
+   */
+  async describeIndex({ indexName }) {
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      const tableInfoQuery = `
+        SELECT sql 
+        FROM sqlite_master 
+        WHERE type='table' 
+        AND name = ?;
+      `;
+      const tableInfo = await this.turso.execute({
+        sql: tableInfoQuery,
+        args: [parsedIndexName]
+      });
+      if (!tableInfo.rows[0]?.sql) {
+        throw new Error(`Table ${parsedIndexName} not found`);
+      }
+      const dimension = parseInt(tableInfo.rows[0].sql.match(/F32_BLOB\((\d+)\)/)?.[1] || "0");
+      const countQuery = `
+        SELECT COUNT(*) as count
+        FROM ${parsedIndexName};
+      `;
+      const countResult = await this.turso.execute({
+        sql: countQuery,
+        args: []
+      });
+      const metric = "cosine";
+      return {
+        dimension,
+        count: countResult?.rows?.[0]?.count ?? 0,
+        metric
+      };
+    } catch (e) {
+      throw new Error(`Failed to describe vector table: ${e.message}`);
+    }
+  }
+  /**
+   * Updates a vector by its ID with the provided vector and/or metadata.
+   *
+   * @param indexName - The name of the index containing the vector.
+   * @param id - The ID of the vector to update.
+   * @param update - An object containing the vector and/or metadata to update.
+   * @param update.vector - An optional array of numbers representing the new vector.
+   * @param update.metadata - An optional record containing the new metadata.
+   * @returns A promise that resolves when the update is complete.
+   * @throws Will throw an error if no updates are provided or if the update operation fails.
+   */
+  async updateVector({ indexName, id, update }) {
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      const updates = [];
+      const args = [];
+      if (update.vector) {
+        updates.push("embedding = vector32(?)");
+        args.push(JSON.stringify(update.vector));
+      }
+      if (update.metadata) {
+        updates.push("metadata = ?");
+        args.push(JSON.stringify(update.metadata));
+      }
+      if (updates.length === 0) {
+        throw new Error("No updates provided");
+      }
+      args.push(id);
+      const query = `
+        UPDATE ${parsedIndexName}
+        SET ${updates.join(", ")}
+        WHERE vector_id = ?;
+      `;
+      await this.turso.execute({
+        sql: query,
+        args
+      });
+    } catch (error) {
+      throw new Error(`Failed to update vector by id: ${id} for index: ${indexName}: ${error.message}`);
+    }
+  }
+  /**
+   * Deletes a vector by its ID.
+   * @param indexName - The name of the index containing the vector.
+   * @param id - The ID of the vector to delete.
+   * @returns A promise that resolves when the deletion is complete.
+   * @throws Will throw an error if the deletion operation fails.
+   */
+  async deleteVector({ indexName, id }) {
+    try {
+      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
+      await this.turso.execute({
+        sql: `DELETE FROM ${parsedIndexName} WHERE vector_id = ?`,
+        args: [id]
+      });
+    } catch (error) {
+      throw new Error(`Failed to delete vector by id: ${id} for index: ${indexName}: ${error.message}`);
+    }
+  }
+  async truncateIndex({ indexName }) {
+    await this.turso.execute({
+      sql: `DELETE FROM ${parseSqlIdentifier(indexName, "index name")}`,
+      args: []
+    });
+  }
+};
 function safelyParseJSON(jsonString) {
   try {
     return JSON.parse(jsonString);
@@ -30196,10 +30964,13 @@ function getLocalMemory() {
     storage: new LibSQLStore({
       url: process.env.DATABASE_URL || "file:local.db"
     }),
-    // TODO: Add vector store and embedder
+    vector: new LibSQLVector({
+      connectionUrl: process.env.DATABASE_URL || "file:local.db"
+    }),
+    embedder: google.textEmbeddingModel(EMBEDDING_MODEL),
     options: {
       lastMessages: LAST_MESSAGES,
-      semanticRecall: false,
+      semanticRecall: true,
       threads: {
         generateTitle: false
       }

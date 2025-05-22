@@ -1,6 +1,6 @@
 import { UpstashStore, UpstashVector } from '@mastra/upstash'
 import { Memory } from '@mastra/memory'
-import { LibSQLStore } from '@mastra/libsql'
+import { LibSQLStore, LibSQLVector } from '@mastra/libsql'
 import { google } from '@ai-sdk/google'
 
 const LAST_MESSAGES = 42
@@ -55,10 +55,13 @@ function getLocalMemory() {
     storage: new LibSQLStore({
       url: process.env.DATABASE_URL || "file:local.db",
     }),
-    // TODO: Add vector store and embedder
+    vector: new LibSQLVector({
+      connectionUrl: process.env.DATABASE_URL || "file:local.db",
+    }),
+    embedder: google.textEmbeddingModel(EMBEDDING_MODEL),
     options: {
       lastMessages: LAST_MESSAGES,
-      semanticRecall: false,
+      semanticRecall: true,
       threads: {
         generateTitle: false,
       },

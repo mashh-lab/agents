@@ -3,6 +3,9 @@ import { Memory } from '@mastra/memory'
 import { LibSQLStore } from '@mastra/libsql'
 import { google } from '@ai-sdk/google'
 
+const LAST_MESSAGES = 42
+const EMBEDDING_MODEL = 'text-embedding-004'
+
 export function getMemory() {
   return process.env.VERCEL ? getUpstashMemory() : getLocalMemory()
 }
@@ -36,9 +39,9 @@ function getUpstashMemory() {
   return new Memory({
     storage: new UpstashStore(upstashStorageOptions),
     vector: new UpstashVector(upstashVectorOptions),
-    embedder: google.textEmbeddingModel('text-embedding-004'),
+    embedder: google.textEmbeddingModel(EMBEDDING_MODEL),
     options: {
-      lastMessages: 10,
+      lastMessages: LAST_MESSAGES,
       semanticRecall: true,
       threads: {
         generateTitle: false,
@@ -52,9 +55,13 @@ function getLocalMemory() {
     storage: new LibSQLStore({
       url: process.env.DATABASE_URL || "file:local.db",
     }),
+    // TODO: Add vector store and embedder
     options: {
-      lastMessages: 10,
+      lastMessages: LAST_MESSAGES,
       semanticRecall: false,
+      threads: {
+        generateTitle: false,
+      },
     },
   });
 }

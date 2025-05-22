@@ -9,10 +9,6 @@ import util from 'node:util';
 import { Buffer as Buffer$1 } from 'node:buffer';
 import { ReadableStream as ReadableStream$1 } from 'node:stream/web';
 import '@libsql/client';
-import 'node:fs/promises';
-import 'node:os';
-import 'node:path';
-import 'fastembed';
 
 // src/adapter/vercel/handler.ts
 var handle = (app) => (req) => {

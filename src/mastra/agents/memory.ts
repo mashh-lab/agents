@@ -1,8 +1,6 @@
 import { UpstashStore, UpstashVector } from '@mastra/upstash'
 import { Memory } from '@mastra/memory'
 import { LibSQLStore, LibSQLVector } from '@mastra/libsql'
-import { fastembed } from "@mastra/fastembed";
-
 
 export function getMemory() {
   return process.env.VERCEL ? getUpstashMemory() : getLocalMemory()
@@ -52,10 +50,6 @@ function getLocalMemory() {
     storage: new LibSQLStore({
       url: process.env.DATABASE_URL || "file:local.db",
     }),
-    vector: new LibSQLVector({
-      connectionUrl: process.env.DATABASE_URL || "file:local.db",
-    }),
-    embedder: fastembed,
     options: {
       lastMessages: 10,
       semanticRecall: true,

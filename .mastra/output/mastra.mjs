@@ -1,9 +1,5 @@
 import crypto$1, { createHash, randomUUID } from 'crypto';
 import { createClient } from '@libsql/client';
-import fsp from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
-import { FlagEmbedding, EmbeddingModel } from 'fastembed';
 
 // src/logger/constants.ts
 var RegisteredLogger = {
@@ -2146,18 +2142,18 @@ var BaggageTracer = class {
 };
 
 var __create = Object.create;
-var __defProp$3 = Object.defineProperty;
+var __defProp$2 = Object.defineProperty;
 var __knownSymbol = (name, symbol) => (symbol = Symbol[name]) ? symbol : Symbol.for("Symbol." + name);
 var __typeError = msg => {
   throw TypeError(msg);
 };
-var __defNormalProp = (obj, key, value) => key in obj ? __defProp$3(obj, key, {
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp$2(obj, key, {
   enumerable: true,
   configurable: true,
   writable: true,
   value
 }) : obj[key] = value;
-var __name = (target, value) => __defProp$3(target, "name", {
+var __name = (target, value) => __defProp$2(target, "name", {
   value,
   configurable: true
 });
@@ -2697,6 +2693,306 @@ Mastra = /*@__PURE__*/(_ => {
   return Mastra;
 })();
 
+var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+
+function getDefaultExportFromCjs (x) {
+	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
+}
+
+// src/errors/ai-sdk-error.ts
+var marker$1 = "vercel.ai.error";
+var symbol$1 = Symbol.for(marker$1);
+var _a$3;
+var _AISDKError = class _AISDKError extends Error {
+  /**
+   * Creates an AI SDK Error.
+   *
+   * @param {Object} params - The parameters for creating the error.
+   * @param {string} params.name - The name of the error.
+   * @param {string} params.message - The error message.
+   * @param {unknown} [params.cause] - The underlying cause of the error.
+   */
+  constructor({
+    name: name14,
+    message,
+    cause
+  }) {
+    super(message);
+    this[_a$3] = true;
+    this.name = name14;
+    this.cause = cause;
+  }
+  /**
+   * Checks if the given error is an AI SDK Error.
+   * @param {unknown} error - The error to check.
+   * @returns {boolean} True if the error is an AI SDK Error, false otherwise.
+   */
+  static isInstance(error) {
+    return _AISDKError.hasMarker(error, marker$1);
+  }
+  static hasMarker(error, marker15) {
+    const markerSymbol = Symbol.for(marker15);
+    return error != null && typeof error === "object" && markerSymbol in error && typeof error[markerSymbol] === "boolean" && error[markerSymbol] === true;
+  }
+};
+_a$3 = symbol$1;
+var AISDKError = _AISDKError;
+
+// src/errors/api-call-error.ts
+var name$1 = "AI_APICallError";
+var marker2$1 = `vercel.ai.error.${name$1}`;
+var symbol2$1 = Symbol.for(marker2$1);
+var _a2$1;
+var APICallError = class extends AISDKError {
+  constructor({
+    message,
+    url,
+    requestBodyValues,
+    statusCode,
+    responseHeaders,
+    responseBody,
+    cause,
+    isRetryable = statusCode != null && (statusCode === 408 || // request timeout
+    statusCode === 409 || // conflict
+    statusCode === 429 || // too many requests
+    statusCode >= 500),
+    // server error
+    data
+  }) {
+    super({ name: name$1, message, cause });
+    this[_a2$1] = true;
+    this.url = url;
+    this.requestBodyValues = requestBodyValues;
+    this.statusCode = statusCode;
+    this.responseHeaders = responseHeaders;
+    this.responseBody = responseBody;
+    this.isRetryable = isRetryable;
+    this.data = data;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker2$1);
+  }
+};
+_a2$1 = symbol2$1;
+
+// src/errors/empty-response-body-error.ts
+var name2$1 = "AI_EmptyResponseBodyError";
+var marker3 = `vercel.ai.error.${name2$1}`;
+var symbol3 = Symbol.for(marker3);
+var _a3;
+var EmptyResponseBodyError = class extends AISDKError {
+  // used in isInstance
+  constructor({ message = "Empty response body" } = {}) {
+    super({ name: name2$1, message });
+    this[_a3] = true;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker3);
+  }
+};
+_a3 = symbol3;
+
+// src/errors/get-error-message.ts
+function getErrorMessage$1(error) {
+  if (error == null) {
+    return "unknown error";
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return JSON.stringify(error);
+}
+
+// src/errors/invalid-argument-error.ts
+var name3 = "AI_InvalidArgumentError";
+var marker4$1 = `vercel.ai.error.${name3}`;
+var symbol4$1 = Symbol.for(marker4$1);
+var _a4$1;
+var InvalidArgumentError$1 = class InvalidArgumentError extends AISDKError {
+  constructor({
+    message,
+    cause,
+    argument
+  }) {
+    super({ name: name3, message, cause });
+    this[_a4$1] = true;
+    this.argument = argument;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker4$1);
+  }
+};
+_a4$1 = symbol4$1;
+
+// src/errors/invalid-prompt-error.ts
+var name4$1 = "AI_InvalidPromptError";
+var marker5$1 = `vercel.ai.error.${name4$1}`;
+var symbol5$1 = Symbol.for(marker5$1);
+var _a5$1;
+var InvalidPromptError = class extends AISDKError {
+  constructor({
+    prompt,
+    message,
+    cause
+  }) {
+    super({ name: name4$1, message: `Invalid prompt: ${message}`, cause });
+    this[_a5$1] = true;
+    this.prompt = prompt;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker5$1);
+  }
+};
+_a5$1 = symbol5$1;
+
+// src/errors/json-parse-error.ts
+var name6$1 = "AI_JSONParseError";
+var marker7$1 = `vercel.ai.error.${name6$1}`;
+var symbol7$1 = Symbol.for(marker7$1);
+var _a7$1;
+var JSONParseError = class extends AISDKError {
+  constructor({ text, cause }) {
+    super({
+      name: name6$1,
+      message: `JSON parsing failed: Text: ${text}.
+Error message: ${getErrorMessage$1(cause)}`,
+      cause
+    });
+    this[_a7$1] = true;
+    this.text = text;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker7$1);
+  }
+};
+_a7$1 = symbol7$1;
+
+// src/errors/load-api-key-error.ts
+var name7$1 = "AI_LoadAPIKeyError";
+var marker8$1 = `vercel.ai.error.${name7$1}`;
+var symbol8$1 = Symbol.for(marker8$1);
+var _a8$1;
+var LoadAPIKeyError = class extends AISDKError {
+  // used in isInstance
+  constructor({ message }) {
+    super({ name: name7$1, message });
+    this[_a8$1] = true;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker8$1);
+  }
+};
+_a8$1 = symbol8$1;
+
+// src/errors/too-many-embedding-values-for-call-error.ts
+var name11$1 = "AI_TooManyEmbeddingValuesForCallError";
+var marker12$1 = `vercel.ai.error.${name11$1}`;
+var symbol12$1 = Symbol.for(marker12$1);
+var _a12$1;
+var TooManyEmbeddingValuesForCallError = class extends AISDKError {
+  constructor(options) {
+    super({
+      name: name11$1,
+      message: `Too many values for a single embedding call. The ${options.provider} model "${options.modelId}" can only embed up to ${options.maxEmbeddingsPerCall} values per call, but ${options.values.length} values were provided.`
+    });
+    this[_a12$1] = true;
+    this.provider = options.provider;
+    this.modelId = options.modelId;
+    this.maxEmbeddingsPerCall = options.maxEmbeddingsPerCall;
+    this.values = options.values;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker12$1);
+  }
+};
+_a12$1 = symbol12$1;
+
+// src/errors/type-validation-error.ts
+var name12$1 = "AI_TypeValidationError";
+var marker13$1 = `vercel.ai.error.${name12$1}`;
+var symbol13$1 = Symbol.for(marker13$1);
+var _a13$1;
+var _TypeValidationError = class _TypeValidationError extends AISDKError {
+  constructor({ value, cause }) {
+    super({
+      name: name12$1,
+      message: `Type validation failed: Value: ${JSON.stringify(value)}.
+Error message: ${getErrorMessage$1(cause)}`,
+      cause
+    });
+    this[_a13$1] = true;
+    this.value = value;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker13$1);
+  }
+  /**
+   * Wraps an error into a TypeValidationError.
+   * If the cause is already a TypeValidationError with the same value, it returns the cause.
+   * Otherwise, it creates a new TypeValidationError.
+   *
+   * @param {Object} params - The parameters for wrapping the error.
+   * @param {unknown} params.value - The value that failed validation.
+   * @param {unknown} params.cause - The original error or cause of the validation failure.
+   * @returns {TypeValidationError} A TypeValidationError instance.
+   */
+  static wrap({
+    value,
+    cause
+  }) {
+    return _TypeValidationError.isInstance(cause) && cause.value === value ? cause : new _TypeValidationError({ value, cause });
+  }
+};
+_a13$1 = symbol13$1;
+var TypeValidationError = _TypeValidationError;
+
+// src/errors/unsupported-functionality-error.ts
+var name13$1 = "AI_UnsupportedFunctionalityError";
+var marker14$1 = `vercel.ai.error.${name13$1}`;
+var symbol14$1 = Symbol.for(marker14$1);
+var _a14$1;
+var UnsupportedFunctionalityError = class extends AISDKError {
+  constructor({
+    functionality,
+    message = `'${functionality}' functionality not supported.`
+  }) {
+    super({ name: name13$1, message });
+    this[_a14$1] = true;
+    this.functionality = functionality;
+  }
+  static isInstance(error) {
+    return AISDKError.hasMarker(error, marker14$1);
+  }
+};
+_a14$1 = symbol14$1;
+
+// src/json-value/is-json.ts
+function isJSONValue(value) {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return true;
+  }
+  if (Array.isArray(value)) {
+    return value.every(isJSONValue);
+  }
+  if (typeof value === "object") {
+    return Object.entries(value).every(
+      ([key, val]) => typeof key === "string" && isJSONValue(val)
+    );
+  }
+  return false;
+}
+function isJSONArray(value) {
+  return Array.isArray(value) && value.every(isJSONValue);
+}
+function isJSONObject(value) {
+  return value != null && typeof value === "object" && Object.entries(value).every(
+    ([key, val]) => typeof key === "string" && isJSONValue(val)
+  );
+}
+
 // This alphabet uses `A-Za-z0-9_-` symbols.
 // The order of characters is optimized for better gzip and brotli compression.
 // References to the same file (works both for gzip and brotli):
@@ -2731,306 +3027,6 @@ let nanoid = (size = 21) => {
 };
 
 var nonSecure = { nanoid, customAlphabet };
-
-var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
-
-function getDefaultExportFromCjs (x) {
-	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
-}
-
-// src/errors/ai-sdk-error.ts
-var marker$2 = "vercel.ai.error";
-var symbol$2 = Symbol.for(marker$2);
-var _a$4;
-var _AISDKError$1 = class _AISDKError extends Error {
-  /**
-   * Creates an AI SDK Error.
-   *
-   * @param {Object} params - The parameters for creating the error.
-   * @param {string} params.name - The name of the error.
-   * @param {string} params.message - The error message.
-   * @param {unknown} [params.cause] - The underlying cause of the error.
-   */
-  constructor({
-    name: name14,
-    message,
-    cause
-  }) {
-    super(message);
-    this[_a$4] = true;
-    this.name = name14;
-    this.cause = cause;
-  }
-  /**
-   * Checks if the given error is an AI SDK Error.
-   * @param {unknown} error - The error to check.
-   * @returns {boolean} True if the error is an AI SDK Error, false otherwise.
-   */
-  static isInstance(error) {
-    return _AISDKError.hasMarker(error, marker$2);
-  }
-  static hasMarker(error, marker15) {
-    const markerSymbol = Symbol.for(marker15);
-    return error != null && typeof error === "object" && markerSymbol in error && typeof error[markerSymbol] === "boolean" && error[markerSymbol] === true;
-  }
-};
-_a$4 = symbol$2;
-var AISDKError$1 = _AISDKError$1;
-
-// src/errors/api-call-error.ts
-var name$1 = "AI_APICallError";
-var marker2$1 = `vercel.ai.error.${name$1}`;
-var symbol2$1 = Symbol.for(marker2$1);
-var _a2$1;
-var APICallError = class extends AISDKError$1 {
-  constructor({
-    message,
-    url,
-    requestBodyValues,
-    statusCode,
-    responseHeaders,
-    responseBody,
-    cause,
-    isRetryable = statusCode != null && (statusCode === 408 || // request timeout
-    statusCode === 409 || // conflict
-    statusCode === 429 || // too many requests
-    statusCode >= 500),
-    // server error
-    data
-  }) {
-    super({ name: name$1, message, cause });
-    this[_a2$1] = true;
-    this.url = url;
-    this.requestBodyValues = requestBodyValues;
-    this.statusCode = statusCode;
-    this.responseHeaders = responseHeaders;
-    this.responseBody = responseBody;
-    this.isRetryable = isRetryable;
-    this.data = data;
-  }
-  static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker2$1);
-  }
-};
-_a2$1 = symbol2$1;
-
-// src/errors/empty-response-body-error.ts
-var name2$1 = "AI_EmptyResponseBodyError";
-var marker3 = `vercel.ai.error.${name2$1}`;
-var symbol3 = Symbol.for(marker3);
-var _a3;
-var EmptyResponseBodyError = class extends AISDKError$1 {
-  // used in isInstance
-  constructor({ message = "Empty response body" } = {}) {
-    super({ name: name2$1, message });
-    this[_a3] = true;
-  }
-  static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker3);
-  }
-};
-_a3 = symbol3;
-
-// src/errors/get-error-message.ts
-function getErrorMessage$1(error) {
-  if (error == null) {
-    return "unknown error";
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return JSON.stringify(error);
-}
-
-// src/errors/invalid-argument-error.ts
-var name3$1 = "AI_InvalidArgumentError";
-var marker4$2 = `vercel.ai.error.${name3$1}`;
-var symbol4$2 = Symbol.for(marker4$2);
-var _a4$2;
-var InvalidArgumentError$2 = class InvalidArgumentError extends AISDKError$1 {
-  constructor({
-    message,
-    cause,
-    argument
-  }) {
-    super({ name: name3$1, message, cause });
-    this[_a4$2] = true;
-    this.argument = argument;
-  }
-  static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker4$2);
-  }
-};
-_a4$2 = symbol4$2;
-
-// src/errors/invalid-prompt-error.ts
-var name4$1 = "AI_InvalidPromptError";
-var marker5$1 = `vercel.ai.error.${name4$1}`;
-var symbol5$1 = Symbol.for(marker5$1);
-var _a5$1;
-var InvalidPromptError = class extends AISDKError$1 {
-  constructor({
-    prompt,
-    message,
-    cause
-  }) {
-    super({ name: name4$1, message: `Invalid prompt: ${message}`, cause });
-    this[_a5$1] = true;
-    this.prompt = prompt;
-  }
-  static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker5$1);
-  }
-};
-_a5$1 = symbol5$1;
-
-// src/errors/json-parse-error.ts
-var name6$1 = "AI_JSONParseError";
-var marker7$1 = `vercel.ai.error.${name6$1}`;
-var symbol7$1 = Symbol.for(marker7$1);
-var _a7$1;
-var JSONParseError = class extends AISDKError$1 {
-  constructor({ text, cause }) {
-    super({
-      name: name6$1,
-      message: `JSON parsing failed: Text: ${text}.
-Error message: ${getErrorMessage$1(cause)}`,
-      cause
-    });
-    this[_a7$1] = true;
-    this.text = text;
-  }
-  static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker7$1);
-  }
-};
-_a7$1 = symbol7$1;
-
-// src/errors/load-api-key-error.ts
-var name7$1 = "AI_LoadAPIKeyError";
-var marker8$1 = `vercel.ai.error.${name7$1}`;
-var symbol8$1 = Symbol.for(marker8$1);
-var _a8$1;
-var LoadAPIKeyError = class extends AISDKError$1 {
-  // used in isInstance
-  constructor({ message }) {
-    super({ name: name7$1, message });
-    this[_a8$1] = true;
-  }
-  static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker8$1);
-  }
-};
-_a8$1 = symbol8$1;
-
-// src/errors/too-many-embedding-values-for-call-error.ts
-var name11$1 = "AI_TooManyEmbeddingValuesForCallError";
-var marker12$1 = `vercel.ai.error.${name11$1}`;
-var symbol12$1 = Symbol.for(marker12$1);
-var _a12$1;
-var TooManyEmbeddingValuesForCallError = class extends AISDKError$1 {
-  constructor(options) {
-    super({
-      name: name11$1,
-      message: `Too many values for a single embedding call. The ${options.provider} model "${options.modelId}" can only embed up to ${options.maxEmbeddingsPerCall} values per call, but ${options.values.length} values were provided.`
-    });
-    this[_a12$1] = true;
-    this.provider = options.provider;
-    this.modelId = options.modelId;
-    this.maxEmbeddingsPerCall = options.maxEmbeddingsPerCall;
-    this.values = options.values;
-  }
-  static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker12$1);
-  }
-};
-_a12$1 = symbol12$1;
-
-// src/errors/type-validation-error.ts
-var name12$1 = "AI_TypeValidationError";
-var marker13$1 = `vercel.ai.error.${name12$1}`;
-var symbol13$1 = Symbol.for(marker13$1);
-var _a13$1;
-var _TypeValidationError = class _TypeValidationError extends AISDKError$1 {
-  constructor({ value, cause }) {
-    super({
-      name: name12$1,
-      message: `Type validation failed: Value: ${JSON.stringify(value)}.
-Error message: ${getErrorMessage$1(cause)}`,
-      cause
-    });
-    this[_a13$1] = true;
-    this.value = value;
-  }
-  static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker13$1);
-  }
-  /**
-   * Wraps an error into a TypeValidationError.
-   * If the cause is already a TypeValidationError with the same value, it returns the cause.
-   * Otherwise, it creates a new TypeValidationError.
-   *
-   * @param {Object} params - The parameters for wrapping the error.
-   * @param {unknown} params.value - The value that failed validation.
-   * @param {unknown} params.cause - The original error or cause of the validation failure.
-   * @returns {TypeValidationError} A TypeValidationError instance.
-   */
-  static wrap({
-    value,
-    cause
-  }) {
-    return _TypeValidationError.isInstance(cause) && cause.value === value ? cause : new _TypeValidationError({ value, cause });
-  }
-};
-_a13$1 = symbol13$1;
-var TypeValidationError = _TypeValidationError;
-
-// src/errors/unsupported-functionality-error.ts
-var name13$1 = "AI_UnsupportedFunctionalityError";
-var marker14$1 = `vercel.ai.error.${name13$1}`;
-var symbol14$1 = Symbol.for(marker14$1);
-var _a14$1;
-var UnsupportedFunctionalityError = class extends AISDKError$1 {
-  constructor({
-    functionality,
-    message = `'${functionality}' functionality not supported.`
-  }) {
-    super({ name: name13$1, message });
-    this[_a14$1] = true;
-    this.functionality = functionality;
-  }
-  static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker14$1);
-  }
-};
-_a14$1 = symbol14$1;
-
-// src/json-value/is-json.ts
-function isJSONValue(value) {
-  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return true;
-  }
-  if (Array.isArray(value)) {
-    return value.every(isJSONValue);
-  }
-  if (typeof value === "object") {
-    return Object.entries(value).every(
-      ([key, val]) => typeof key === "string" && isJSONValue(val)
-    );
-  }
-  return false;
-}
-function isJSONArray(value) {
-  return Array.isArray(value) && value.every(isJSONValue);
-}
-function isJSONObject(value) {
-  return value != null && typeof value === "object" && Object.entries(value).every(
-    ([key, val]) => typeof key === "string" && isJSONValue(val)
-  );
-}
 
 var secureJsonParse = {exports: {}};
 
@@ -3307,7 +3303,7 @@ function extractResponseHeaders(response) {
   });
   return headers;
 }
-var createIdGenerator$1 = ({
+var createIdGenerator = ({
   prefix,
   size: defaultSize = 16,
   alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
@@ -3318,14 +3314,14 @@ var createIdGenerator$1 = ({
     return generator;
   }
   if (alphabet.includes(separator)) {
-    throw new InvalidArgumentError$2({
+    throw new InvalidArgumentError$1({
       argument: "separator",
       message: `The separator "${separator}" must not be part of the alphabet "${alphabet}".`
     });
   }
   return (size) => `${prefix}${separator}${generator(size)}`;
 };
-var generateId = createIdGenerator$1();
+var generateId = createIdGenerator();
 
 // src/get-error-message.ts
 function getErrorMessage(error) {
@@ -3488,7 +3484,7 @@ function parseProviderOptions({
     schema
   });
   if (!parsedProviderOptions.success) {
-    throw new InvalidArgumentError$2({
+    throw new InvalidArgumentError$1({
       argument: "providerOptions",
       message: `invalid ${provider} provider options`,
       cause: parsedProviderOptions.error
@@ -10834,7 +10830,7 @@ var textStreamPart2 = {
     return { type: "text", value };
   }
 };
-var dataStreamPart$1 = {
+var dataStreamPart = {
   code: "2",
   name: "data",
   parse: (value) => {
@@ -10854,7 +10850,7 @@ var errorStreamPart2 = {
     return { type: "error", value };
   }
 };
-var messageAnnotationsStreamPart$1 = {
+var messageAnnotationsStreamPart = {
   code: "8",
   name: "message_annotations",
   parse: (value) => {
@@ -10864,7 +10860,7 @@ var messageAnnotationsStreamPart$1 = {
     return { type: "message_annotations", value };
   }
 };
-var toolCallStreamPart$1 = {
+var toolCallStreamPart = {
   code: "9",
   name: "tool_call",
   parse: (value) => {
@@ -10879,7 +10875,7 @@ var toolCallStreamPart$1 = {
     };
   }
 };
-var toolResultStreamPart$1 = {
+var toolResultStreamPart = {
   code: "a",
   name: "tool_result",
   parse: (value) => {
@@ -10894,7 +10890,7 @@ var toolResultStreamPart$1 = {
     };
   }
 };
-var toolCallStreamingStartStreamPart$1 = {
+var toolCallStreamingStartStreamPart = {
   code: "b",
   name: "tool_call_streaming_start",
   parse: (value) => {
@@ -10909,7 +10905,7 @@ var toolCallStreamingStartStreamPart$1 = {
     };
   }
 };
-var toolCallDeltaStreamPart$1 = {
+var toolCallDeltaStreamPart = {
   code: "c",
   name: "tool_call_delta",
   parse: (value) => {
@@ -10924,7 +10920,7 @@ var toolCallDeltaStreamPart$1 = {
     };
   }
 };
-var finishMessageStreamPart$1 = {
+var finishMessageStreamPart = {
   code: "d",
   name: "finish_message",
   parse: (value) => {
@@ -10948,7 +10944,7 @@ var finishMessageStreamPart$1 = {
     };
   }
 };
-var finishStepStreamPart$1 = {
+var finishStepStreamPart = {
   code: "e",
   name: "finish_step",
   parse: (value) => {
@@ -11057,15 +11053,15 @@ var fileStreamPart = {
 };
 var dataStreamParts = [
   textStreamPart2,
-  dataStreamPart$1,
+  dataStreamPart,
   errorStreamPart2,
-  messageAnnotationsStreamPart$1,
-  toolCallStreamPart$1,
-  toolResultStreamPart$1,
-  toolCallStreamingStartStreamPart$1,
-  toolCallDeltaStreamPart$1,
-  finishMessageStreamPart$1,
-  finishStepStreamPart$1,
+  messageAnnotationsStreamPart,
+  toolCallStreamPart,
+  toolResultStreamPart,
+  toolCallStreamingStartStreamPart,
+  toolCallDeltaStreamPart,
+  finishMessageStreamPart,
+  finishStepStreamPart,
   startStepStreamPart,
   reasoningStreamPart,
   sourcePart,
@@ -11161,14 +11157,14 @@ function asSchema(schema) {
   return isSchema(schema) ? schema : zodSchema(schema);
 }
 
-var __defProp$2 = Object.defineProperty;
-var __export$2 = (target, all) => {
+var __defProp$1 = Object.defineProperty;
+var __export$1 = (target, all) => {
   for (var name17 in all)
-    __defProp$2(target, name17, { get: all[name17], enumerable: true });
+    __defProp$1(target, name17, { get: all[name17], enumerable: true });
 };
 
 // core/util/prepare-response-headers.ts
-function prepareResponseHeaders$1(headers, {
+function prepareResponseHeaders(headers, {
   contentType,
   dataStreamVersion
 }) {
@@ -11229,10 +11225,10 @@ function writeToServerResponse({
   read();
 }
 var name = "AI_InvalidArgumentError";
-var marker$1 = `vercel.ai.error.${name}`;
-var symbol$1 = Symbol.for(marker$1);
-var _a$3;
-var InvalidArgumentError$1 = class InvalidArgumentError extends AISDKError$1 {
+var marker = `vercel.ai.error.${name}`;
+var symbol = Symbol.for(marker);
+var _a$2;
+var InvalidArgumentError = class extends AISDKError {
   constructor({
     parameter,
     value,
@@ -11242,20 +11238,20 @@ var InvalidArgumentError$1 = class InvalidArgumentError extends AISDKError$1 {
       name,
       message: `Invalid argument for parameter ${parameter}: ${message}`
     });
-    this[_a$3] = true;
+    this[_a$2] = true;
     this.parameter = parameter;
     this.value = value;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker$1);
+    return AISDKError.hasMarker(error, marker);
   }
 };
-_a$3 = symbol$1;
+_a$2 = symbol;
 var name2 = "AI_RetryError";
 var marker2 = `vercel.ai.error.${name2}`;
 var symbol2 = Symbol.for(marker2);
 var _a2;
-var RetryError = class extends AISDKError$1 {
+var RetryError = class extends AISDKError {
   constructor({
     message,
     reason,
@@ -11268,7 +11264,7 @@ var RetryError = class extends AISDKError$1 {
     this.lastError = errors[errors.length - 1];
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker2);
+    return AISDKError.hasMarker(error, marker2);
   }
 };
 _a2 = symbol2;
@@ -11332,14 +11328,14 @@ function prepareRetries({
 }) {
   if (maxRetries != null) {
     if (!Number.isInteger(maxRetries)) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "maxRetries",
         value: maxRetries,
         message: "maxRetries must be an integer"
       });
     }
     if (maxRetries < 0) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "maxRetries",
         value: maxRetries,
         message: "maxRetries must be >= 0"
@@ -11846,10 +11842,10 @@ function detectMimeType({
   return void 0;
 }
 var name4 = "AI_NoObjectGeneratedError";
-var marker4$1 = `vercel.ai.error.${name4}`;
-var symbol4$1 = Symbol.for(marker4$1);
-var _a4$1;
-var NoObjectGeneratedError = class extends AISDKError$1 {
+var marker4 = `vercel.ai.error.${name4}`;
+var symbol4 = Symbol.for(marker4);
+var _a4;
+var NoObjectGeneratedError = class extends AISDKError {
   constructor({
     message = "No object generated.",
     cause,
@@ -11859,22 +11855,22 @@ var NoObjectGeneratedError = class extends AISDKError$1 {
     finishReason
   }) {
     super({ name: name4, message, cause });
-    this[_a4$1] = true;
+    this[_a4] = true;
     this.text = text2;
     this.response = response;
     this.usage = usage;
     this.finishReason = finishReason;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker4$1);
+    return AISDKError.hasMarker(error, marker4);
   }
 };
-_a4$1 = symbol4$1;
+_a4 = symbol4;
 var name5 = "AI_DownloadError";
 var marker5 = `vercel.ai.error.${name5}`;
 var symbol5 = Symbol.for(marker5);
 var _a5;
-var DownloadError = class extends AISDKError$1 {
+var DownloadError = class extends AISDKError {
   constructor({
     url,
     statusCode,
@@ -11889,7 +11885,7 @@ var DownloadError = class extends AISDKError$1 {
     this.statusText = statusText;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker5);
+    return AISDKError.hasMarker(error, marker5);
   }
 };
 _a5 = symbol5;
@@ -11922,7 +11918,7 @@ var name6 = "AI_InvalidDataContentError";
 var marker6 = `vercel.ai.error.${name6}`;
 var symbol6 = Symbol.for(marker6);
 var _a6;
-var InvalidDataContentError = class extends AISDKError$1 {
+var InvalidDataContentError = class extends AISDKError {
   constructor({
     content,
     cause,
@@ -11933,11 +11929,11 @@ var InvalidDataContentError = class extends AISDKError$1 {
     this.content = content;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker6);
+    return AISDKError.hasMarker(error, marker6);
   }
 };
 _a6 = symbol6;
-var dataContentSchema$1 = unionType([
+var dataContentSchema = unionType([
   stringType(),
   instanceOfType(Uint8Array),
   instanceOfType(ArrayBuffer),
@@ -11990,7 +11986,7 @@ var name7 = "AI_InvalidMessageRoleError";
 var marker7 = `vercel.ai.error.${name7}`;
 var symbol7 = Symbol.for(marker7);
 var _a7;
-var InvalidMessageRoleError = class extends AISDKError$1 {
+var InvalidMessageRoleError = class extends AISDKError {
   constructor({
     role,
     message = `Invalid message role: '${role}'. Must be one of: "system", "user", "assistant", "tool".`
@@ -12000,7 +11996,7 @@ var InvalidMessageRoleError = class extends AISDKError$1 {
     this.role = role;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker7);
+    return AISDKError.hasMarker(error, marker7);
   }
 };
 _a7 = symbol7;
@@ -12269,14 +12265,14 @@ function prepareCallSettings({
 }) {
   if (maxTokens != null) {
     if (!Number.isInteger(maxTokens)) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "maxTokens",
         value: maxTokens,
         message: "maxTokens must be an integer"
       });
     }
     if (maxTokens < 1) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "maxTokens",
         value: maxTokens,
         message: "maxTokens must be >= 1"
@@ -12285,7 +12281,7 @@ function prepareCallSettings({
   }
   if (temperature != null) {
     if (typeof temperature !== "number") {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "temperature",
         value: temperature,
         message: "temperature must be a number"
@@ -12294,7 +12290,7 @@ function prepareCallSettings({
   }
   if (topP != null) {
     if (typeof topP !== "number") {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "topP",
         value: topP,
         message: "topP must be a number"
@@ -12303,7 +12299,7 @@ function prepareCallSettings({
   }
   if (topK != null) {
     if (typeof topK !== "number") {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "topK",
         value: topK,
         message: "topK must be a number"
@@ -12312,7 +12308,7 @@ function prepareCallSettings({
   }
   if (presencePenalty != null) {
     if (typeof presencePenalty !== "number") {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "presencePenalty",
         value: presencePenalty,
         message: "presencePenalty must be a number"
@@ -12321,7 +12317,7 @@ function prepareCallSettings({
   }
   if (frequencyPenalty != null) {
     if (typeof frequencyPenalty !== "number") {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "frequencyPenalty",
         value: frequencyPenalty,
         message: "frequencyPenalty must be a number"
@@ -12330,7 +12326,7 @@ function prepareCallSettings({
   }
   if (seed != null) {
     if (!Number.isInteger(seed)) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "seed",
         value: seed,
         message: "seed must be an integer"
@@ -12430,7 +12426,7 @@ var name8 = "AI_MessageConversionError";
 var marker8 = `vercel.ai.error.${name8}`;
 var symbol8 = Symbol.for(marker8);
 var _a8;
-var MessageConversionError = class extends AISDKError$1 {
+var MessageConversionError = class extends AISDKError {
   constructor({
     originalMessage,
     message
@@ -12440,7 +12436,7 @@ var MessageConversionError = class extends AISDKError$1 {
     this.originalMessage = originalMessage;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker8);
+    return AISDKError.hasMarker(error, marker8);
   }
 };
 _a8 = symbol8;
@@ -12676,23 +12672,23 @@ function convertToCoreMessages(messages, options) {
   }
   return coreMessages;
 }
-var jsonValueSchema$1 = lazyType(
+var jsonValueSchema = lazyType(
   () => unionType([
     nullType(),
     stringType(),
     numberType(),
     booleanType(),
-    recordType(stringType(), jsonValueSchema$1),
-    arrayType(jsonValueSchema$1)
+    recordType(stringType(), jsonValueSchema),
+    arrayType(jsonValueSchema)
   ])
 );
 
 // core/types/provider-metadata.ts
-var providerMetadataSchema$1 = recordType(
+var providerMetadataSchema = recordType(
   stringType(),
-  recordType(stringType(), jsonValueSchema$1)
+  recordType(stringType(), jsonValueSchema)
 );
-var toolResultContentSchema$1 = arrayType(
+var toolResultContentSchema = arrayType(
   unionType([
     objectType({ type: literalType("text"), text: stringType() }),
     objectType({
@@ -12704,102 +12700,102 @@ var toolResultContentSchema$1 = arrayType(
 );
 
 // core/prompt/content-part.ts
-var textPartSchema$1 = objectType({
+var textPartSchema = objectType({
   type: literalType("text"),
   text: stringType(),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
-var imagePartSchema$1 = objectType({
+var imagePartSchema = objectType({
   type: literalType("image"),
-  image: unionType([dataContentSchema$1, instanceOfType(URL)]),
+  image: unionType([dataContentSchema, instanceOfType(URL)]),
   mimeType: stringType().optional(),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
-var filePartSchema$1 = objectType({
+var filePartSchema = objectType({
   type: literalType("file"),
-  data: unionType([dataContentSchema$1, instanceOfType(URL)]),
+  data: unionType([dataContentSchema, instanceOfType(URL)]),
   filename: stringType().optional(),
   mimeType: stringType(),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
 var reasoningPartSchema = objectType({
   type: literalType("reasoning"),
   text: stringType(),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
 var redactedReasoningPartSchema = objectType({
   type: literalType("redacted-reasoning"),
   data: stringType(),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
-var toolCallPartSchema$1 = objectType({
+var toolCallPartSchema = objectType({
   type: literalType("tool-call"),
   toolCallId: stringType(),
   toolName: stringType(),
   args: unknownType(),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
-var toolResultPartSchema$1 = objectType({
+var toolResultPartSchema = objectType({
   type: literalType("tool-result"),
   toolCallId: stringType(),
   toolName: stringType(),
   result: unknownType(),
-  content: toolResultContentSchema$1.optional(),
+  content: toolResultContentSchema.optional(),
   isError: booleanType().optional(),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
 
 // core/prompt/message.ts
-var coreSystemMessageSchema$1 = objectType({
+var coreSystemMessageSchema = objectType({
   role: literalType("system"),
   content: stringType(),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
-var coreUserMessageSchema$1 = objectType({
+var coreUserMessageSchema = objectType({
   role: literalType("user"),
   content: unionType([
     stringType(),
-    arrayType(unionType([textPartSchema$1, imagePartSchema$1, filePartSchema$1]))
+    arrayType(unionType([textPartSchema, imagePartSchema, filePartSchema]))
   ]),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
-var coreAssistantMessageSchema$1 = objectType({
+var coreAssistantMessageSchema = objectType({
   role: literalType("assistant"),
   content: unionType([
     stringType(),
     arrayType(
       unionType([
-        textPartSchema$1,
-        filePartSchema$1,
+        textPartSchema,
+        filePartSchema,
         reasoningPartSchema,
         redactedReasoningPartSchema,
-        toolCallPartSchema$1
+        toolCallPartSchema
       ])
     )
   ]),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
-var coreToolMessageSchema$1 = objectType({
+var coreToolMessageSchema = objectType({
   role: literalType("tool"),
-  content: arrayType(toolResultPartSchema$1),
-  providerOptions: providerMetadataSchema$1.optional(),
-  experimental_providerMetadata: providerMetadataSchema$1.optional()
+  content: arrayType(toolResultPartSchema),
+  providerOptions: providerMetadataSchema.optional(),
+  experimental_providerMetadata: providerMetadataSchema.optional()
 });
 var coreMessageSchema = unionType([
-  coreSystemMessageSchema$1,
-  coreUserMessageSchema$1,
-  coreAssistantMessageSchema$1,
-  coreToolMessageSchema$1
+  coreSystemMessageSchema,
+  coreUserMessageSchema,
+  coreAssistantMessageSchema,
+  coreToolMessageSchema
 ]);
 
 // core/prompt/standardize-prompt.ts
@@ -13216,7 +13212,7 @@ function validateObjectGenerationInput({
   enumValues
 }) {
   if (output != null && output !== "object" && output !== "array" && output !== "enum" && output !== "no-schema") {
-    throw new InvalidArgumentError$1({
+    throw new InvalidArgumentError({
       parameter: "output",
       value: output,
       message: "Invalid output type."
@@ -13224,35 +13220,35 @@ function validateObjectGenerationInput({
   }
   if (output === "no-schema") {
     if (mode === "auto" || mode === "tool") {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "mode",
         value: mode,
         message: 'Mode must be "json" for no-schema output.'
       });
     }
     if (schema != null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "schema",
         value: schema,
         message: "Schema is not supported for no-schema output."
       });
     }
     if (schemaDescription != null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "schemaDescription",
         value: schemaDescription,
         message: "Schema description is not supported for no-schema output."
       });
     }
     if (schemaName != null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "schemaName",
         value: schemaName,
         message: "Schema name is not supported for no-schema output."
       });
     }
     if (enumValues != null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "enumValues",
         value: enumValues,
         message: "Enum values are not supported for no-schema output."
@@ -13261,14 +13257,14 @@ function validateObjectGenerationInput({
   }
   if (output === "object") {
     if (schema == null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "schema",
         value: schema,
         message: "Schema is required for object output."
       });
     }
     if (enumValues != null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "enumValues",
         value: enumValues,
         message: "Enum values are not supported for object output."
@@ -13277,14 +13273,14 @@ function validateObjectGenerationInput({
   }
   if (output === "array") {
     if (schema == null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "schema",
         value: schema,
         message: "Element schema is required for array output."
       });
     }
     if (enumValues != null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "enumValues",
         value: enumValues,
         message: "Enum values are not supported for array output."
@@ -13293,28 +13289,28 @@ function validateObjectGenerationInput({
   }
   if (output === "enum") {
     if (schema != null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "schema",
         value: schema,
         message: "Schema is not supported for enum output."
       });
     }
     if (schemaDescription != null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "schemaDescription",
         value: schemaDescription,
         message: "Schema description is not supported for enum output."
       });
     }
     if (schemaName != null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "schemaName",
         value: schemaName,
         message: "Schema name is not supported for enum output."
       });
     }
     if (enumValues == null) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "enumValues",
         value: enumValues,
         message: "Enum values are required for enum output."
@@ -13322,7 +13318,7 @@ function validateObjectGenerationInput({
     }
     for (const value of enumValues) {
       if (typeof value !== "string") {
-        throw new InvalidArgumentError$1({
+        throw new InvalidArgumentError({
           parameter: "enumValues",
           value,
           message: "Enum values must be strings."
@@ -13353,7 +13349,7 @@ function processPart(part) {
 }
 
 // core/generate-object/generate-object.ts
-var originalGenerateId = createIdGenerator$1({ prefix: "aiobj", size: 24 });
+var originalGenerateId = createIdGenerator({ prefix: "aiobj", size: 24 });
 async function generateObject({
   model,
   enum: enumValues,
@@ -13767,7 +13763,7 @@ var DefaultGenerateObjectResult = class {
     var _a17;
     return new Response(JSON.stringify(this.object), {
       status: (_a17 = init == null ? void 0 : init.status) != null ? _a17 : 200,
-      headers: prepareResponseHeaders$1(init == null ? void 0 : init.headers, {
+      headers: prepareResponseHeaders(init == null ? void 0 : init.headers, {
         contentType: "application/json; charset=utf-8"
       })
     });
@@ -13916,7 +13912,7 @@ function now() {
 }
 
 // core/generate-object/stream-object.ts
-var originalGenerateId2 = createIdGenerator$1({ prefix: "aiobj", size: 24 });
+var originalGenerateId2 = createIdGenerator({ prefix: "aiobj", size: 24 });
 function streamObject({
   model,
   schema: inputSchema,
@@ -14480,7 +14476,7 @@ var DefaultStreamObjectResult = class {
     var _a17;
     return new Response(this.textStream.pipeThrough(new TextEncoderStream()), {
       status: (_a17 = init == null ? void 0 : init.status) != null ? _a17 : 200,
-      headers: prepareResponseHeaders$1(init == null ? void 0 : init.headers, {
+      headers: prepareResponseHeaders(init == null ? void 0 : init.headers, {
         contentType: "text/plain; charset=utf-8"
       })
     });
@@ -14490,22 +14486,22 @@ var name9 = "AI_NoOutputSpecifiedError";
 var marker9 = `vercel.ai.error.${name9}`;
 var symbol9 = Symbol.for(marker9);
 var _a9;
-var NoOutputSpecifiedError = class extends AISDKError$1 {
+var NoOutputSpecifiedError = class extends AISDKError {
   // used in isInstance
   constructor({ message = "No output specified." } = {}) {
     super({ name: name9, message });
     this[_a9] = true;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker9);
+    return AISDKError.hasMarker(error, marker9);
   }
 };
 _a9 = symbol9;
-var name10$1 = "AI_ToolExecutionError";
-var marker10 = `vercel.ai.error.${name10$1}`;
+var name10 = "AI_ToolExecutionError";
+var marker10 = `vercel.ai.error.${name10}`;
 var symbol10 = Symbol.for(marker10);
 var _a10;
-var ToolExecutionError = class extends AISDKError$1 {
+var ToolExecutionError = class extends AISDKError {
   constructor({
     toolArgs,
     toolName,
@@ -14513,14 +14509,14 @@ var ToolExecutionError = class extends AISDKError$1 {
     cause,
     message = `Error executing tool ${toolName}: ${getErrorMessage$1(cause)}`
   }) {
-    super({ name: name10$1, message, cause });
+    super({ name: name10, message, cause });
     this[_a10] = true;
     this.toolArgs = toolArgs;
     this.toolName = toolName;
     this.toolCallId = toolCallId;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker10);
+    return AISDKError.hasMarker(error, marker10);
   }
 };
 _a10 = symbol10;
@@ -14587,10 +14583,10 @@ function removeTextAfterLastWhitespace(text2) {
   return match ? match.prefix + match.whitespace : text2;
 }
 var name11 = "AI_InvalidToolArgumentsError";
-var marker11$1 = `vercel.ai.error.${name11}`;
-var symbol11$1 = Symbol.for(marker11$1);
-var _a11$1;
-var InvalidToolArgumentsError = class extends AISDKError$1 {
+var marker11 = `vercel.ai.error.${name11}`;
+var symbol11 = Symbol.for(marker11);
+var _a11;
+var InvalidToolArgumentsError = class extends AISDKError {
   constructor({
     toolArgs,
     toolName,
@@ -14600,20 +14596,20 @@ var InvalidToolArgumentsError = class extends AISDKError$1 {
     )}`
   }) {
     super({ name: name11, message, cause });
-    this[_a11$1] = true;
+    this[_a11] = true;
     this.toolArgs = toolArgs;
     this.toolName = toolName;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker11$1);
+    return AISDKError.hasMarker(error, marker11);
   }
 };
-_a11$1 = symbol11$1;
+_a11 = symbol11;
 var name12 = "AI_NoSuchToolError";
 var marker12 = `vercel.ai.error.${name12}`;
 var symbol12 = Symbol.for(marker12);
 var _a12;
-var NoSuchToolError = class extends AISDKError$1 {
+var NoSuchToolError = class extends AISDKError {
   constructor({
     toolName,
     availableTools = void 0,
@@ -14625,7 +14621,7 @@ var NoSuchToolError = class extends AISDKError$1 {
     this.availableTools = availableTools;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker12);
+    return AISDKError.hasMarker(error, marker12);
   }
 };
 _a12 = symbol12;
@@ -14633,7 +14629,7 @@ var name13 = "AI_ToolCallRepairError";
 var marker13 = `vercel.ai.error.${name13}`;
 var symbol13 = Symbol.for(marker13);
 var _a13;
-var ToolCallRepairError = class extends AISDKError$1 {
+var ToolCallRepairError = class extends AISDKError {
   constructor({
     cause,
     originalError,
@@ -14644,7 +14640,7 @@ var ToolCallRepairError = class extends AISDKError$1 {
     this.originalError = originalError;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker13);
+    return AISDKError.hasMarker(error, marker13);
   }
 };
 _a13 = symbol13;
@@ -14792,11 +14788,11 @@ function toResponseMessages({
 }
 
 // core/generate-text/generate-text.ts
-var originalGenerateId3 = createIdGenerator$1({
+var originalGenerateId3 = createIdGenerator({
   prefix: "aitxt",
   size: 24
 });
-var originalGenerateMessageId = createIdGenerator$1({
+var originalGenerateMessageId = createIdGenerator({
   prefix: "msg",
   size: 24
 });
@@ -14829,7 +14825,7 @@ async function generateText({
 }) {
   var _a17;
   if (maxSteps < 1) {
-    throw new InvalidArgumentError$1({
+    throw new InvalidArgumentError({
       parameter: "maxSteps",
       value: maxSteps,
       message: "maxSteps must be at least 1"
@@ -15278,7 +15274,7 @@ function asFiles(files) {
 
 // core/generate-text/output.ts
 var output_exports = {};
-__export$2(output_exports, {
+__export$1(output_exports, {
   object: () => object,
   text: () => text
 });
@@ -15286,7 +15282,7 @@ var name14 = "AI_InvalidStreamPartError";
 var marker14 = `vercel.ai.error.${name14}`;
 var symbol14 = Symbol.for(marker14);
 var _a14;
-var InvalidStreamPartError = class extends AISDKError$1 {
+var InvalidStreamPartError = class extends AISDKError {
   constructor({
     chunk,
     message
@@ -15296,7 +15292,7 @@ var InvalidStreamPartError = class extends AISDKError$1 {
     this.chunk = chunk;
   }
   static isInstance(error) {
-    return AISDKError$1.hasMarker(error, marker14);
+    return AISDKError.hasMarker(error, marker14);
   }
 };
 _a14 = symbol14;
@@ -15405,7 +15401,7 @@ async function consumeStream({
 }
 
 // core/util/merge-streams.ts
-function mergeStreams$1(stream1, stream2) {
+function mergeStreams(stream1, stream2) {
   const reader1 = stream1.getReader();
   const reader2 = stream2.getReader();
   let lastRead1 = void 0;
@@ -15693,11 +15689,11 @@ function runToolsTransformation({
 }
 
 // core/generate-text/stream-text.ts
-var originalGenerateId4 = createIdGenerator$1({
+var originalGenerateId4 = createIdGenerator({
   prefix: "aitxt",
   size: 24
 });
-var originalGenerateMessageId2 = createIdGenerator$1({
+var originalGenerateMessageId2 = createIdGenerator({
   prefix: "msg",
   size: 24
 });
@@ -15858,7 +15854,7 @@ var DefaultStreamTextResult = class {
     this.stepsPromise = new DelayedPromise();
     var _a17;
     if (maxSteps < 1) {
-      throw new InvalidArgumentError$1({
+      throw new InvalidArgumentError({
         parameter: "maxSteps",
         value: maxSteps,
         message: "maxSteps must be at least 1"
@@ -15911,7 +15907,7 @@ var DefaultStreamTextResult = class {
         }
         if (part.type === "reasoning-signature") {
           if (activeReasoningText == null) {
-            throw new AISDKError$1({
+            throw new AISDKError({
               name: "InvalidStreamPart",
               message: "reasoning-signature without reasoning"
             });
@@ -16866,7 +16862,7 @@ var DefaultStreamTextResult = class {
       sendSources: options == null ? void 0 : options.sendSources,
       experimental_sendFinish: options == null ? void 0 : options.experimental_sendFinish
     }).pipeThrough(new TextEncoderStream());
-    return (options == null ? void 0 : options.data) ? mergeStreams$1(options == null ? void 0 : options.data.stream, stream) : stream;
+    return (options == null ? void 0 : options.data) ? mergeStreams(options == null ? void 0 : options.data.stream, stream) : stream;
   }
   mergeIntoDataStream(writer, options) {
     writer.merge(
@@ -16902,7 +16898,7 @@ var DefaultStreamTextResult = class {
       {
         status,
         statusText,
-        headers: prepareResponseHeaders$1(headers, {
+        headers: prepareResponseHeaders(headers, {
           contentType: "text/plain; charset=utf-8",
           dataStreamVersion: "v1"
         })
@@ -16913,7 +16909,7 @@ var DefaultStreamTextResult = class {
     var _a17;
     return new Response(this.textStream.pipeThrough(new TextEncoderStream()), {
       status: (_a17 = init == null ? void 0 : init.status) != null ? _a17 : 200,
-      headers: prepareResponseHeaders$1(init == null ? void 0 : init.headers, {
+      headers: prepareResponseHeaders(init == null ? void 0 : init.headers, {
         contentType: "text/plain; charset=utf-8"
       })
     });
@@ -17047,15 +17043,15 @@ unionType([
 ]);
 
 // streams/langchain-adapter.ts
-var langchain_adapter_exports$1 = {};
-__export$2(langchain_adapter_exports$1, {
+var langchain_adapter_exports = {};
+__export$1(langchain_adapter_exports, {
   mergeIntoDataStream: () => mergeIntoDataStream,
-  toDataStream: () => toDataStream$1,
-  toDataStreamResponse: () => toDataStreamResponse$1
+  toDataStream: () => toDataStream,
+  toDataStreamResponse: () => toDataStreamResponse
 });
 
 // streams/stream-callbacks.ts
-function createCallbacksTransformer$1(callbacks = {}) {
+function createCallbacksTransformer(callbacks = {}) {
   const textEncoder = new TextEncoder();
   let aggregatedResponse = "";
   return new TransformStream({
@@ -17095,17 +17091,17 @@ function toDataStreamInternal(stream, callbacks) {
         }
         if ("event" in value) {
           if (value.event === "on_chat_model_stream") {
-            forwardAIMessageChunk$1(
+            forwardAIMessageChunk(
               (_a17 = value.data) == null ? void 0 : _a17.chunk,
               controller
             );
           }
           return;
         }
-        forwardAIMessageChunk$1(value, controller);
+        forwardAIMessageChunk(value, controller);
       }
     })
-  ).pipeThrough(createCallbacksTransformer$1(callbacks)).pipeThrough(new TextDecoderStream()).pipeThrough(
+  ).pipeThrough(createCallbacksTransformer(callbacks)).pipeThrough(new TextDecoderStream()).pipeThrough(
     new TransformStream({
       transform: async (chunk, controller) => {
         controller.enqueue(formatDataStreamPart("text", chunk));
@@ -17113,12 +17109,12 @@ function toDataStreamInternal(stream, callbacks) {
     })
   );
 }
-function toDataStream$1(stream, callbacks) {
+function toDataStream(stream, callbacks) {
   return toDataStreamInternal(stream, callbacks).pipeThrough(
     new TextEncoderStream()
   );
 }
-function toDataStreamResponse$1(stream, options) {
+function toDataStreamResponse(stream, options) {
   var _a17;
   const dataStream = toDataStreamInternal(
     stream,
@@ -17126,11 +17122,11 @@ function toDataStreamResponse$1(stream, options) {
   ).pipeThrough(new TextEncoderStream());
   const data = options == null ? void 0 : options.data;
   const init = options == null ? void 0 : options.init;
-  const responseStream = data ? mergeStreams$1(data.stream, dataStream) : dataStream;
+  const responseStream = data ? mergeStreams(data.stream, dataStream) : dataStream;
   return new Response(responseStream, {
     status: (_a17 = init == null ? void 0 : init.status) != null ? _a17 : 200,
     statusText: init == null ? void 0 : init.statusText,
-    headers: prepareResponseHeaders$1(init == null ? void 0 : init.headers, {
+    headers: prepareResponseHeaders(init == null ? void 0 : init.headers, {
       contentType: "text/plain; charset=utf-8",
       dataStreamVersion: "v1"
     })
@@ -17139,7 +17135,7 @@ function toDataStreamResponse$1(stream, options) {
 function mergeIntoDataStream(stream, options) {
   options.dataStream.merge(toDataStreamInternal(stream, options.callbacks));
 }
-function forwardAIMessageChunk$1(chunk, controller) {
+function forwardAIMessageChunk(chunk, controller) {
   if (typeof chunk.content === "string") {
     controller.enqueue(chunk.content);
   } else {
@@ -17153,11 +17149,11 @@ function forwardAIMessageChunk$1(chunk, controller) {
 }
 
 // streams/llamaindex-adapter.ts
-var llamaindex_adapter_exports$1 = {};
-__export$2(llamaindex_adapter_exports$1, {
+var llamaindex_adapter_exports = {};
+__export$1(llamaindex_adapter_exports, {
   mergeIntoDataStream: () => mergeIntoDataStream2,
-  toDataStream: () => toDataStream2$1,
-  toDataStreamResponse: () => toDataStreamResponse2$1
+  toDataStream: () => toDataStream2,
+  toDataStreamResponse: () => toDataStreamResponse2
 });
 function toDataStreamInternal2(stream, callbacks) {
   const trimStart = trimStartOfStream();
@@ -17167,7 +17163,7 @@ function toDataStreamInternal2(stream, callbacks) {
         controller.enqueue(trimStart(message.delta));
       }
     })
-  ).pipeThrough(createCallbacksTransformer$1(callbacks)).pipeThrough(new TextDecoderStream()).pipeThrough(
+  ).pipeThrough(createCallbacksTransformer(callbacks)).pipeThrough(new TextDecoderStream()).pipeThrough(
     new TransformStream({
       transform: async (chunk, controller) => {
         controller.enqueue(formatDataStreamPart("text", chunk));
@@ -17175,22 +17171,22 @@ function toDataStreamInternal2(stream, callbacks) {
     })
   );
 }
-function toDataStream2$1(stream, callbacks) {
+function toDataStream2(stream, callbacks) {
   return toDataStreamInternal2(stream, callbacks).pipeThrough(
     new TextEncoderStream()
   );
 }
-function toDataStreamResponse2$1(stream, options = {}) {
+function toDataStreamResponse2(stream, options = {}) {
   var _a17;
   const { init, data, callbacks } = options;
   const dataStream = toDataStreamInternal2(stream, callbacks).pipeThrough(
     new TextEncoderStream()
   );
-  const responseStream = data ? mergeStreams$1(data.stream, dataStream) : dataStream;
+  const responseStream = data ? mergeStreams(data.stream, dataStream) : dataStream;
   return new Response(responseStream, {
     status: (_a17 = init == null ? void 0 : init.status) != null ? _a17 : 200,
     statusText: init == null ? void 0 : init.statusText,
-    headers: prepareResponseHeaders$1(init == null ? void 0 : init.headers, {
+    headers: prepareResponseHeaders(init == null ? void 0 : init.headers, {
       contentType: "text/plain; charset=utf-8",
       dataStreamVersion: "v1"
     })
@@ -19042,16 +19038,6 @@ function parseSqlIdentifier(name, kind = "identifier") {
   }
   return name;
 }
-function parseFieldKey(key) {
-  if (!key) throw new Error("Field key cannot be empty");
-  const segments = key.split(".");
-  for (const segment of segments) {
-    if (!SQL_IDENTIFIER_PATTERN.test(segment) || segment.length > 63) {
-      throw new Error(`Invalid field key segment: ${segment} in ${key}`);
-    }
-  }
-  return key;
-}
 
 // src/voice/voice.ts
 var _MastraVoice_decorators, _init$1, _a$1;
@@ -19748,12 +19734,12 @@ function resolveMaybePromise(value, cb) {
   }
   return cb(value);
 }
-var _Agent_decorators, _init, _a$2;
+var _Agent_decorators, _init, _a;
 _Agent_decorators = [InstrumentClass({
   prefix: "agent",
   excludeMethods: ["hasOwnMemory", "getMemory", "__primitive", "__registerMastra", "__registerPrimitives", "__setTools", "__setLogger", "__setTelemetry", "log", "getModel", "getInstructions", "getTools", "getLLM", "getWorkflows"]
 })];
-var Agent = class extends (_a$2 = MastraBase) {
+var Agent = class extends (_a = MastraBase) {
   id;
   name;
   #instructions;
@@ -21173,7 +21159,7 @@ var Agent = class extends (_a$2 = MastraBase) {
   }
 };
 Agent = /*@__PURE__*/(_ => {
-  _init = __decoratorStart(_a$2);
+  _init = __decoratorStart(_a);
   Agent = __decorateElement(_init, 0, "Agent", _Agent_decorators, Agent);
   __runInitializers(_init, 1, Agent);
 
@@ -21398,235 +21384,6 @@ var MastraStorage = class extends MastraBase {
       keys: { workflow_name: workflowName, run_id: runId }
     });
     return d ? d.snapshot : null;
-  }
-};
-
-// src/vector/vector.ts
-var MastraVector = class extends MastraBase {
-  constructor() {
-    super({ name: "MastraVector", component: "VECTOR" });
-  }
-  get indexSeparator() {
-    return "_";
-  }
-  async validateExistingIndex(indexName, dimension, metric) {
-    let info;
-    try {
-      info = await this.describeIndex({ indexName });
-    } catch (infoError) {
-      const message = `Index "${indexName}" already exists, but failed to fetch index info for dimension check: ${infoError}`;
-      this.logger?.error(message);
-      throw new Error(message);
-    }
-    const existingDim = info?.dimension;
-    const existingMetric = info?.metric;
-    if (existingDim === dimension) {
-      this.logger?.info(
-        `Index "${indexName}" already exists with ${existingDim} dimensions and metric ${existingMetric}, skipping creation.`
-      );
-      if (existingMetric !== metric) {
-        this.logger?.warn(
-          `Attempted to create index with metric "${metric}", but index already exists with metric "${existingMetric}". To use a different metric, delete and recreate the index.`
-        );
-      }
-    } else if (info) {
-      const message = `Index "${indexName}" already exists with ${existingDim} dimensions, but ${dimension} dimensions were requested`;
-      this.logger?.error(message);
-      throw new Error(message);
-    } else {
-      const message = `Index "${indexName}" already exists, but could not retrieve its dimensions for validation.`;
-      this.logger?.error(message);
-      throw new Error(message);
-    }
-  }
-};
-
-// src/vector/filter/base.ts
-var BaseFilterTranslator = class _BaseFilterTranslator {
-  /**
-   * Operator type checks
-   */
-  isOperator(key) {
-    return key.startsWith("$");
-  }
-  static BASIC_OPERATORS = ["$eq", "$ne"];
-  static NUMERIC_OPERATORS = ["$gt", "$gte", "$lt", "$lte"];
-  static ARRAY_OPERATORS = ["$in", "$nin", "$all", "$elemMatch"];
-  static LOGICAL_OPERATORS = ["$and", "$or", "$not", "$nor"];
-  static ELEMENT_OPERATORS = ["$exists"];
-  static REGEX_OPERATORS = ["$regex", "$options"];
-  static DEFAULT_OPERATORS = {
-    logical: _BaseFilterTranslator.LOGICAL_OPERATORS,
-    basic: _BaseFilterTranslator.BASIC_OPERATORS,
-    numeric: _BaseFilterTranslator.NUMERIC_OPERATORS,
-    array: _BaseFilterTranslator.ARRAY_OPERATORS,
-    element: _BaseFilterTranslator.ELEMENT_OPERATORS,
-    regex: _BaseFilterTranslator.REGEX_OPERATORS
-  };
-  isLogicalOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.logical.includes(key);
-  }
-  isBasicOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.basic.includes(key);
-  }
-  isNumericOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.numeric.includes(key);
-  }
-  isArrayOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.array.includes(key);
-  }
-  isElementOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.element.includes(key);
-  }
-  isRegexOperator(key) {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS.regex.includes(key);
-  }
-  isFieldOperator(key) {
-    return this.isOperator(key) && !this.isLogicalOperator(key);
-  }
-  isCustomOperator(key) {
-    const support = this.getSupportedOperators();
-    return support.custom?.includes(key) ?? false;
-  }
-  getSupportedOperators() {
-    return _BaseFilterTranslator.DEFAULT_OPERATORS;
-  }
-  isValidOperator(key) {
-    const support = this.getSupportedOperators();
-    const allSupported = Object.values(support).flat();
-    return allSupported.includes(key);
-  }
-  /**
-   * Value normalization for comparison operators
-   */
-  normalizeComparisonValue(value) {
-    if (value instanceof Date) {
-      return value.toISOString();
-    }
-    if (typeof value === "number" && Object.is(value, -0)) {
-      return 0;
-    }
-    return value;
-  }
-  /**
-   * Helper method to simulate $all operator using $and + $eq when needed.
-   * Some vector stores don't support $all natively.
-   */
-  simulateAllOperator(field, values) {
-    return {
-      $and: values.map((value) => ({
-        [field]: { $in: [this.normalizeComparisonValue(value)] }
-      }))
-    };
-  }
-  /**
-   * Utility functions for type checking
-   */
-  isPrimitive(value) {
-    return value === null || value === void 0 || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
-  }
-  isRegex(value) {
-    return value instanceof RegExp;
-  }
-  isEmpty(obj) {
-    return obj === null || obj === void 0 || typeof obj === "object" && Object.keys(obj).length === 0;
-  }
-  static ErrorMessages = {
-    UNSUPPORTED_OPERATOR: (op) => `Unsupported operator: ${op}`,
-    INVALID_LOGICAL_OPERATOR_LOCATION: (op, path) => `Logical operator ${op} cannot be used at field level: ${path}`,
-    NOT_REQUIRES_OBJECT: `$not operator requires an object`,
-    NOT_CANNOT_BE_EMPTY: `$not operator cannot be empty`,
-    INVALID_LOGICAL_OPERATOR_CONTENT: (path) => `Logical operators must contain field conditions, not direct operators: ${path}`,
-    INVALID_TOP_LEVEL_OPERATOR: (op) => `Invalid top-level operator: ${op}`,
-    ELEM_MATCH_REQUIRES_OBJECT: `$elemMatch requires an object with conditions`
-  };
-  /**
-   * Helper to handle array value normalization consistently
-   */
-  normalizeArrayValues(values) {
-    return values.map((value) => this.normalizeComparisonValue(value));
-  }
-  validateFilter(filter) {
-    const validation = this.validateFilterSupport(filter);
-    if (!validation.supported) {
-      throw new Error(validation.messages.join(", "));
-    }
-  }
-  /**
-   * Validates if a filter structure is supported by the specific vector DB
-   * and returns detailed validation information.
-   */
-  validateFilterSupport(node, path = "") {
-    const messages = [];
-    if (this.isPrimitive(node) || this.isEmpty(node)) {
-      return { supported: true, messages: [] };
-    }
-    if (Array.isArray(node)) {
-      const arrayResults = node.map((item) => this.validateFilterSupport(item, path));
-      const arrayMessages = arrayResults.flatMap((r) => r.messages);
-      return {
-        supported: arrayResults.every((r) => r.supported),
-        messages: arrayMessages
-      };
-    }
-    const nodeObj = node;
-    let isSupported = true;
-    for (const [key, value] of Object.entries(nodeObj)) {
-      const newPath = path ? `${path}.${key}` : key;
-      if (this.isOperator(key)) {
-        if (!this.isValidOperator(key)) {
-          isSupported = false;
-          messages.push(_BaseFilterTranslator.ErrorMessages.UNSUPPORTED_OPERATOR(key));
-          continue;
-        }
-        if (!path && !this.isLogicalOperator(key)) {
-          isSupported = false;
-          messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_TOP_LEVEL_OPERATOR(key));
-          continue;
-        }
-        if (key === "$elemMatch" && (typeof value !== "object" || Array.isArray(value))) {
-          isSupported = false;
-          messages.push(_BaseFilterTranslator.ErrorMessages.ELEM_MATCH_REQUIRES_OBJECT);
-          continue;
-        }
-        if (this.isLogicalOperator(key)) {
-          if (key === "$not") {
-            if (Array.isArray(value) || typeof value !== "object") {
-              isSupported = false;
-              messages.push(_BaseFilterTranslator.ErrorMessages.NOT_REQUIRES_OBJECT);
-              continue;
-            }
-            if (this.isEmpty(value)) {
-              isSupported = false;
-              messages.push(_BaseFilterTranslator.ErrorMessages.NOT_CANNOT_BE_EMPTY);
-              continue;
-            }
-            continue;
-          }
-          if (path && !this.isLogicalOperator(path.split(".").pop())) {
-            isSupported = false;
-            messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_LOGICAL_OPERATOR_LOCATION(key, newPath));
-            continue;
-          }
-          if (Array.isArray(value)) {
-            const hasDirectOperators = value.some(
-              (item) => typeof item === "object" && Object.keys(item).length === 1 && this.isFieldOperator(Object.keys(item)[0])
-            );
-            if (hasDirectOperators) {
-              isSupported = false;
-              messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_LOGICAL_OPERATOR_CONTENT(newPath));
-              continue;
-            }
-          }
-        }
-      }
-      const nestedValidation = this.validateFilterSupport(value, newPath);
-      if (!nestedValidation.supported) {
-        isSupported = false;
-        messages.push(...nestedValidation.messages);
-      }
-    }
-    return { supported: isSupported, messages };
   }
 };
 
@@ -22614,15 +22371,15 @@ var sha1 = sha1$1.exports;
 var sha1Exports = sha1$1.exports;
 var sha12 = /*@__PURE__*/getDefaultExportFromCjs(sha1Exports);
 
-var __defProp$1 = Object.defineProperty;
-var __export$1 = (target, all) => {
+var __defProp = Object.defineProperty;
+var __export = (target, all) => {
   for (var name in all)
-    __defProp$1(target, name, { get: all[name], enumerable: true });
+    __defProp(target, name, { get: all[name], enumerable: true });
 };
 
 // pkg/error.ts
 var error_exports = {};
-__export$1(error_exports, {
+__export(error_exports, {
   UpstashError: () => UpstashError$1,
   UrlError: () => UrlError
 });
@@ -27138,6 +26895,46 @@ var Redis2 = class _Redis extends Redis {
   }
 };
 
+// src/vector/vector.ts
+var MastraVector = class extends MastraBase {
+  constructor() {
+    super({ name: "MastraVector", component: "VECTOR" });
+  }
+  get indexSeparator() {
+    return "_";
+  }
+  async validateExistingIndex(indexName, dimension, metric) {
+    let info;
+    try {
+      info = await this.describeIndex({ indexName });
+    } catch (infoError) {
+      const message = `Index "${indexName}" already exists, but failed to fetch index info for dimension check: ${infoError}`;
+      this.logger?.error(message);
+      throw new Error(message);
+    }
+    const existingDim = info?.dimension;
+    const existingMetric = info?.metric;
+    if (existingDim === dimension) {
+      this.logger?.info(
+        `Index "${indexName}" already exists with ${existingDim} dimensions and metric ${existingMetric}, skipping creation.`
+      );
+      if (existingMetric !== metric) {
+        this.logger?.warn(
+          `Attempted to create index with metric "${metric}", but index already exists with metric "${existingMetric}". To use a different metric, delete and recreate the index.`
+        );
+      }
+    } else if (info) {
+      const message = `Index "${indexName}" already exists with ${existingDim} dimensions, but ${dimension} dimensions were requested`;
+      this.logger?.error(message);
+      throw new Error(message);
+    } else {
+      const message = `Index "${indexName}" already exists, but could not retrieve its dimensions for validation.`;
+      this.logger?.error(message);
+      throw new Error(message);
+    }
+  }
+};
+
 // src/error/index.ts
 var UpstashError = class extends Error {
   constructor(message) {
@@ -28043,6 +27840,195 @@ var Index2 = class _Index extends Index {
       throw new Error("Unable to find environment variable: `UPSTASH_VECTOR_REST_TOKEN`");
     }
     return new _Index({ ...config, url, token });
+  }
+};
+
+// src/vector/filter/base.ts
+var BaseFilterTranslator = class _BaseFilterTranslator {
+  /**
+   * Operator type checks
+   */
+  isOperator(key) {
+    return key.startsWith("$");
+  }
+  static BASIC_OPERATORS = ["$eq", "$ne"];
+  static NUMERIC_OPERATORS = ["$gt", "$gte", "$lt", "$lte"];
+  static ARRAY_OPERATORS = ["$in", "$nin", "$all", "$elemMatch"];
+  static LOGICAL_OPERATORS = ["$and", "$or", "$not", "$nor"];
+  static ELEMENT_OPERATORS = ["$exists"];
+  static REGEX_OPERATORS = ["$regex", "$options"];
+  static DEFAULT_OPERATORS = {
+    logical: _BaseFilterTranslator.LOGICAL_OPERATORS,
+    basic: _BaseFilterTranslator.BASIC_OPERATORS,
+    numeric: _BaseFilterTranslator.NUMERIC_OPERATORS,
+    array: _BaseFilterTranslator.ARRAY_OPERATORS,
+    element: _BaseFilterTranslator.ELEMENT_OPERATORS,
+    regex: _BaseFilterTranslator.REGEX_OPERATORS
+  };
+  isLogicalOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.logical.includes(key);
+  }
+  isBasicOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.basic.includes(key);
+  }
+  isNumericOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.numeric.includes(key);
+  }
+  isArrayOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.array.includes(key);
+  }
+  isElementOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.element.includes(key);
+  }
+  isRegexOperator(key) {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS.regex.includes(key);
+  }
+  isFieldOperator(key) {
+    return this.isOperator(key) && !this.isLogicalOperator(key);
+  }
+  isCustomOperator(key) {
+    const support = this.getSupportedOperators();
+    return support.custom?.includes(key) ?? false;
+  }
+  getSupportedOperators() {
+    return _BaseFilterTranslator.DEFAULT_OPERATORS;
+  }
+  isValidOperator(key) {
+    const support = this.getSupportedOperators();
+    const allSupported = Object.values(support).flat();
+    return allSupported.includes(key);
+  }
+  /**
+   * Value normalization for comparison operators
+   */
+  normalizeComparisonValue(value) {
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    if (typeof value === "number" && Object.is(value, -0)) {
+      return 0;
+    }
+    return value;
+  }
+  /**
+   * Helper method to simulate $all operator using $and + $eq when needed.
+   * Some vector stores don't support $all natively.
+   */
+  simulateAllOperator(field, values) {
+    return {
+      $and: values.map((value) => ({
+        [field]: { $in: [this.normalizeComparisonValue(value)] }
+      }))
+    };
+  }
+  /**
+   * Utility functions for type checking
+   */
+  isPrimitive(value) {
+    return value === null || value === void 0 || typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+  }
+  isRegex(value) {
+    return value instanceof RegExp;
+  }
+  isEmpty(obj) {
+    return obj === null || obj === void 0 || typeof obj === "object" && Object.keys(obj).length === 0;
+  }
+  static ErrorMessages = {
+    UNSUPPORTED_OPERATOR: (op) => `Unsupported operator: ${op}`,
+    INVALID_LOGICAL_OPERATOR_LOCATION: (op, path) => `Logical operator ${op} cannot be used at field level: ${path}`,
+    NOT_REQUIRES_OBJECT: `$not operator requires an object`,
+    NOT_CANNOT_BE_EMPTY: `$not operator cannot be empty`,
+    INVALID_LOGICAL_OPERATOR_CONTENT: (path) => `Logical operators must contain field conditions, not direct operators: ${path}`,
+    INVALID_TOP_LEVEL_OPERATOR: (op) => `Invalid top-level operator: ${op}`,
+    ELEM_MATCH_REQUIRES_OBJECT: `$elemMatch requires an object with conditions`
+  };
+  /**
+   * Helper to handle array value normalization consistently
+   */
+  normalizeArrayValues(values) {
+    return values.map((value) => this.normalizeComparisonValue(value));
+  }
+  validateFilter(filter) {
+    const validation = this.validateFilterSupport(filter);
+    if (!validation.supported) {
+      throw new Error(validation.messages.join(", "));
+    }
+  }
+  /**
+   * Validates if a filter structure is supported by the specific vector DB
+   * and returns detailed validation information.
+   */
+  validateFilterSupport(node, path = "") {
+    const messages = [];
+    if (this.isPrimitive(node) || this.isEmpty(node)) {
+      return { supported: true, messages: [] };
+    }
+    if (Array.isArray(node)) {
+      const arrayResults = node.map((item) => this.validateFilterSupport(item, path));
+      const arrayMessages = arrayResults.flatMap((r) => r.messages);
+      return {
+        supported: arrayResults.every((r) => r.supported),
+        messages: arrayMessages
+      };
+    }
+    const nodeObj = node;
+    let isSupported = true;
+    for (const [key, value] of Object.entries(nodeObj)) {
+      const newPath = path ? `${path}.${key}` : key;
+      if (this.isOperator(key)) {
+        if (!this.isValidOperator(key)) {
+          isSupported = false;
+          messages.push(_BaseFilterTranslator.ErrorMessages.UNSUPPORTED_OPERATOR(key));
+          continue;
+        }
+        if (!path && !this.isLogicalOperator(key)) {
+          isSupported = false;
+          messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_TOP_LEVEL_OPERATOR(key));
+          continue;
+        }
+        if (key === "$elemMatch" && (typeof value !== "object" || Array.isArray(value))) {
+          isSupported = false;
+          messages.push(_BaseFilterTranslator.ErrorMessages.ELEM_MATCH_REQUIRES_OBJECT);
+          continue;
+        }
+        if (this.isLogicalOperator(key)) {
+          if (key === "$not") {
+            if (Array.isArray(value) || typeof value !== "object") {
+              isSupported = false;
+              messages.push(_BaseFilterTranslator.ErrorMessages.NOT_REQUIRES_OBJECT);
+              continue;
+            }
+            if (this.isEmpty(value)) {
+              isSupported = false;
+              messages.push(_BaseFilterTranslator.ErrorMessages.NOT_CANNOT_BE_EMPTY);
+              continue;
+            }
+            continue;
+          }
+          if (path && !this.isLogicalOperator(path.split(".").pop())) {
+            isSupported = false;
+            messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_LOGICAL_OPERATOR_LOCATION(key, newPath));
+            continue;
+          }
+          if (Array.isArray(value)) {
+            const hasDirectOperators = value.some(
+              (item) => typeof item === "object" && Object.keys(item).length === 1 && this.isFieldOperator(Object.keys(item)[0])
+            );
+            if (hasDirectOperators) {
+              isSupported = false;
+              messages.push(_BaseFilterTranslator.ErrorMessages.INVALID_LOGICAL_OPERATOR_CONTENT(newPath));
+              continue;
+            }
+          }
+        }
+      }
+      const nestedValidation = this.validateFilterSupport(value, newPath);
+      if (!nestedValidation.supported) {
+        isSupported = false;
+        messages.push(...nestedValidation.messages);
+      }
+    }
+    return { supported: isSupported, messages };
   }
 };
 
@@ -29634,764 +29620,6 @@ Notes:
   }
 };
 
-// src/vector/index.ts
-var LibSQLFilterTranslator = class extends BaseFilterTranslator {
-  getSupportedOperators() {
-    return {
-      ...BaseFilterTranslator.DEFAULT_OPERATORS,
-      regex: [],
-      custom: ["$contains", "$size"]
-    };
-  }
-  translate(filter) {
-    if (this.isEmpty(filter)) {
-      return filter;
-    }
-    this.validateFilter(filter);
-    return this.translateNode(filter);
-  }
-  translateNode(node, currentPath = "") {
-    if (this.isRegex(node)) {
-      throw new Error("Direct regex pattern format is not supported in LibSQL");
-    }
-    const withPath = (result2) => currentPath ? { [currentPath]: result2 } : result2;
-    if (this.isPrimitive(node)) {
-      return withPath({ $eq: this.normalizeComparisonValue(node) });
-    }
-    if (Array.isArray(node)) {
-      return withPath({ $in: this.normalizeArrayValues(node) });
-    }
-    const entries = Object.entries(node);
-    const result = {};
-    for (const [key, value] of entries) {
-      const newPath = currentPath ? `${currentPath}.${key}` : key;
-      if (this.isLogicalOperator(key)) {
-        result[key] = Array.isArray(value) ? value.map((filter) => this.translateNode(filter)) : this.translateNode(value);
-      } else if (this.isOperator(key)) {
-        if (this.isArrayOperator(key) && !Array.isArray(value) && key !== "$elemMatch") {
-          result[key] = [value];
-        } else if (this.isBasicOperator(key) && Array.isArray(value)) {
-          result[key] = JSON.stringify(value);
-        } else {
-          result[key] = value;
-        }
-      } else if (typeof value === "object" && value !== null) {
-        const hasOperators = Object.keys(value).some((k) => this.isOperator(k));
-        if (hasOperators) {
-          result[newPath] = this.translateNode(value);
-        } else {
-          Object.assign(result, this.translateNode(value, newPath));
-        }
-      } else {
-        result[newPath] = this.translateNode(value);
-      }
-    }
-    return result;
-  }
-  // TODO: Look more into regex support for LibSQL
-  // private translateRegexPattern(pattern: string, options: string = ''): any {
-  //   if (!options) return { $regex: pattern };
-  //   const flags = options
-  //     .split('')
-  //     .filter(f => 'imsux'.includes(f))
-  //     .join('');
-  //   return {
-  //     $regex: pattern,
-  //     $options: flags,
-  //   };
-  // }
-};
-var createBasicOperator = (symbol) => {
-  return (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    return {
-      sql: `CASE 
-        WHEN ? IS NULL THEN json_extract(metadata, '$."${jsonPathKey}"') IS ${symbol === "=" ? "" : "NOT"} NULL
-        ELSE json_extract(metadata, '$."${jsonPathKey}"') ${symbol} ?
-      END`,
-      needsValue: true,
-      transformValue: () => {
-        return [value, value];
-      }
-    };
-  };
-};
-var createNumericOperator = (symbol) => {
-  return (key) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    return {
-      sql: `CAST(json_extract(metadata, '$."${jsonPathKey}"') AS NUMERIC) ${symbol} ?`,
-      needsValue: true
-    };
-  };
-};
-var validateJsonArray = (key) => `json_valid(json_extract(metadata, '$."${key}"'))
-   AND json_type(json_extract(metadata, '$."${key}"')) = 'array'`;
-var pattern = /json_extract\(metadata, '\$\."[^"]*"(\."[^"]*")*'\)/g;
-function buildElemMatchConditions(value) {
-  const conditions = Object.entries(value).map(([field, fieldValue]) => {
-    if (field.startsWith("$")) {
-      const { sql, values } = buildCondition("elem.value", { [field]: fieldValue });
-      const elemSql = sql.replace(pattern, "elem.value");
-      return { sql: elemSql, values };
-    } else if (typeof fieldValue === "object" && !Array.isArray(fieldValue)) {
-      const { sql, values } = buildCondition(field, fieldValue);
-      const elemSql = sql.replace(pattern, `json_extract(elem.value, '$."${field}"')`);
-      return { sql: elemSql, values };
-    } else {
-      const parsedFieldKey = parseFieldKey(field);
-      return {
-        sql: `json_extract(elem.value, '$."${parsedFieldKey}"') = ?`,
-        values: [fieldValue]
-      };
-    }
-  });
-  return conditions;
-}
-var FILTER_OPERATORS = {
-  $eq: createBasicOperator("="),
-  $ne: createBasicOperator("!="),
-  $gt: createNumericOperator(">"),
-  $gte: createNumericOperator(">="),
-  $lt: createNumericOperator("<"),
-  $lte: createNumericOperator("<="),
-  // Array Operators
-  $in: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    const arr = Array.isArray(value) ? value : [value];
-    if (arr.length === 0) {
-      return { sql: "1 = 0", needsValue: true, transformValue: () => [] };
-    }
-    const paramPlaceholders = arr.map(() => "?").join(",");
-    return {
-      sql: `(
-      CASE
-        WHEN ${validateJsonArray(jsonPathKey)} THEN
-          EXISTS (
-            SELECT 1 FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
-            WHERE elem.value IN (SELECT value FROM json_each(?))
-          )
-        ELSE json_extract(metadata, '$."${jsonPathKey}"') IN (${paramPlaceholders})
-      END
-    )`,
-      needsValue: true,
-      transformValue: () => [JSON.stringify(arr), ...arr]
-    };
-  },
-  $nin: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    const arr = Array.isArray(value) ? value : [value];
-    if (arr.length === 0) {
-      return { sql: "1 = 1", needsValue: true, transformValue: () => [] };
-    }
-    const paramPlaceholders = arr.map(() => "?").join(",");
-    return {
-      sql: `(
-      CASE
-        WHEN ${validateJsonArray(jsonPathKey)} THEN
-          NOT EXISTS (
-            SELECT 1 FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
-            WHERE elem.value IN (SELECT value FROM json_each(?))
-          )
-        ELSE json_extract(metadata, '$."${jsonPathKey}"') NOT IN (${paramPlaceholders})
-      END
-    )`,
-      needsValue: true,
-      transformValue: () => [JSON.stringify(arr), ...arr]
-    };
-  },
-  $all: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    let sql;
-    const arrayValue = Array.isArray(value) ? value : [value];
-    if (arrayValue.length === 0) {
-      sql = "1 = 0";
-    } else {
-      sql = `(
-      CASE
-        WHEN ${validateJsonArray(jsonPathKey)} THEN
-          NOT EXISTS (
-            SELECT value
-            FROM json_each(?)
-            WHERE value NOT IN (
-              SELECT value
-              FROM json_each(json_extract(metadata, '$."${jsonPathKey}"'))
-            )
-          )
-        ELSE FALSE
-      END
-    )`;
-    }
-    return {
-      sql,
-      needsValue: true,
-      transformValue: () => {
-        if (arrayValue.length === 0) {
-          return [];
-        }
-        return [JSON.stringify(arrayValue)];
-      }
-    };
-  },
-  $elemMatch: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    if (typeof value !== "object" || Array.isArray(value)) {
-      throw new Error("$elemMatch requires an object with conditions");
-    }
-    const conditions = buildElemMatchConditions(value);
-    return {
-      sql: `(
-        CASE
-          WHEN ${validateJsonArray(jsonPathKey)} THEN
-            EXISTS (
-              SELECT 1
-              FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as elem
-              WHERE ${conditions.map((c) => c.sql).join(" AND ")}
-            )
-          ELSE FALSE
-        END
-      )`,
-      needsValue: true,
-      transformValue: () => conditions.flatMap((c) => c.values)
-    };
-  },
-  // Element Operators
-  $exists: (key) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    return {
-      sql: `json_extract(metadata, '$."${jsonPathKey}"') IS NOT NULL`,
-      needsValue: false
-    };
-  },
-  // Logical Operators
-  $and: (key) => ({
-    sql: `(${key})`,
-    needsValue: false
-  }),
-  $or: (key) => ({
-    sql: `(${key})`,
-    needsValue: false
-  }),
-  $not: (key) => ({ sql: `NOT (${key})`, needsValue: false }),
-  $nor: (key) => ({
-    sql: `NOT (${key})`,
-    needsValue: false
-  }),
-  $size: (key, paramIndex) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    return {
-      sql: `(
-    CASE
-      WHEN json_type(json_extract(metadata, '$."${jsonPathKey}"')) = 'array' THEN 
-        json_array_length(json_extract(metadata, '$."${jsonPathKey}"')) = $${paramIndex}
-      ELSE FALSE
-    END
-  )`,
-      needsValue: true
-    };
-  },
-  //   /**
-  //    * Regex Operators
-  //    * Supports case insensitive and multiline
-  //    */
-  //   $regex: (key: string): FilterOperator => ({
-  //     sql: `json_extract(metadata, '$."${toJsonPathKey(key)}"') = ?`,
-  //     needsValue: true,
-  //     transformValue: (value: any) => {
-  //       const pattern = typeof value === 'object' ? value.$regex : value;
-  //       const options = typeof value === 'object' ? value.$options || '' : '';
-  //       let sql = `json_extract(metadata, '$."${toJsonPathKey(key)}"')`;
-  //       // Handle multiline
-  //       //   if (options.includes('m')) {
-  //       //     sql = `REPLACE(${sql}, CHAR(10), '\n')`;
-  //       //   }
-  //       //       let finalPattern = pattern;
-  //       // if (options) {
-  //       //   finalPattern = `(\\?${options})${pattern}`;
-  //       // }
-  //       //   // Handle case insensitivity
-  //       //   if (options.includes('i')) {
-  //       //     sql = `LOWER(${sql}) REGEXP LOWER(?)`;
-  //       //   } else {
-  //       //     sql = `${sql} REGEXP ?`;
-  //       //   }
-  //       if (options.includes('m')) {
-  //         sql = `EXISTS (
-  //         SELECT 1
-  //         FROM json_each(
-  //           json_array(
-  //             ${sql},
-  //             REPLACE(${sql}, CHAR(10), CHAR(13))
-  //           )
-  //         ) as lines
-  //         WHERE lines.value REGEXP ?
-  //       )`;
-  //       } else {
-  //         sql = `${sql} REGEXP ?`;
-  //       }
-  //       // Handle case insensitivity
-  //       if (options.includes('i')) {
-  //         sql = sql.replace('REGEXP ?', 'REGEXP LOWER(?)');
-  //         sql = sql.replace('value REGEXP', 'LOWER(value) REGEXP');
-  //       }
-  //       // Handle extended - allows whitespace and comments in pattern
-  //       if (options.includes('x')) {
-  //         // Remove whitespace and comments from pattern
-  //         const cleanPattern = pattern.replace(/\s+|#.*$/gm, '');
-  //         return {
-  //           sql,
-  //           values: [cleanPattern],
-  //         };
-  //       }
-  //       return {
-  //         sql,
-  //         values: [pattern],
-  //       };
-  //     },
-  //   }),
-  $contains: (key, value) => {
-    const jsonPathKey = parseJsonPathKey(key);
-    let sql;
-    if (Array.isArray(value)) {
-      sql = `(
-        SELECT ${validateJsonArray(jsonPathKey)}
-        AND EXISTS (
-          SELECT 1
-          FROM json_each(json_extract(metadata, '$."${jsonPathKey}"')) as m
-          WHERE m.value IN (SELECT value FROM json_each(?))
-        )
-      )`;
-    } else if (typeof value === "string") {
-      sql = `lower(json_extract(metadata, '$."${jsonPathKey}"')) LIKE '%' || lower(?) || '%' ESCAPE '\\'`;
-    } else {
-      sql = `json_extract(metadata, '$."${jsonPathKey}"') = ?`;
-    }
-    return {
-      sql,
-      needsValue: true,
-      transformValue: () => {
-        if (Array.isArray(value)) {
-          return [JSON.stringify(value)];
-        }
-        if (typeof value === "object" && value !== null) {
-          return [JSON.stringify(value)];
-        }
-        if (typeof value === "string") {
-          return [escapeLikePattern(value)];
-        }
-        return [value];
-      }
-    };
-  }
-  /**
-   * $objectContains: True JSON containment for advanced use (deep sub-object match).
-   * Usage: { field: { $objectContains: { ...subobject } } }
-   */
-  // $objectContains: (key: string) => ({
-  //   sql: '', // Will be overridden by transformValue
-  //   needsValue: true,
-  //   transformValue: (value: any) => ({
-  //     sql: `json_type(json_extract(metadata, '$."${toJsonPathKey(key)}"')) = 'object'
-  //         AND json_patch(json_extract(metadata, '$."${toJsonPathKey(key)}"'), ?) = json_extract(metadata, '$."${toJsonPathKey(key)}"')`,
-  //     values: [JSON.stringify(value)],
-  //   }),
-  // }),
-};
-function isFilterResult(obj) {
-  return obj && typeof obj === "object" && typeof obj.sql === "string" && Array.isArray(obj.values);
-}
-var parseJsonPathKey = (key) => {
-  const parsedKey = parseFieldKey(key);
-  return parsedKey.replace(/\./g, '"."');
-};
-function escapeLikePattern(str) {
-  return str.replace(/([%_\\])/g, "\\$1");
-}
-function buildFilterQuery(filter) {
-  if (!filter) {
-    return { sql: "", values: [] };
-  }
-  const values = [];
-  const conditions = Object.entries(filter).map(([key, value]) => {
-    const condition = buildCondition(key, value);
-    values.push(...condition.values);
-    return condition.sql;
-  }).join(" AND ");
-  return {
-    sql: conditions ? `WHERE ${conditions}` : "",
-    values
-  };
-}
-function buildCondition(key, value, parentPath) {
-  if (["$and", "$or", "$not", "$nor"].includes(key)) {
-    return handleLogicalOperator(key, value);
-  }
-  if (!value || typeof value !== "object") {
-    return {
-      sql: `json_extract(metadata, '$."${key.replace(/\./g, '"."')}"') = ?`,
-      values: [value]
-    };
-  }
-  return handleOperator(key, value);
-}
-function handleLogicalOperator(key, value, parentPath) {
-  if (!value || value.length === 0) {
-    switch (key) {
-      case "$and":
-      case "$nor":
-        return { sql: "true", values: [] };
-      case "$or":
-        return { sql: "false", values: [] };
-      case "$not":
-        throw new Error("$not operator cannot be empty");
-      default:
-        return { sql: "true", values: [] };
-    }
-  }
-  if (key === "$not") {
-    const entries = Object.entries(value);
-    const conditions2 = entries.map(([fieldKey, fieldValue]) => buildCondition(fieldKey, fieldValue));
-    return {
-      sql: `NOT (${conditions2.map((c) => c.sql).join(" AND ")})`,
-      values: conditions2.flatMap((c) => c.values)
-    };
-  }
-  const values = [];
-  const joinOperator = key === "$or" || key === "$nor" ? "OR" : "AND";
-  const conditions = Array.isArray(value) ? value.map((f) => {
-    const entries = Object.entries(f);
-    return entries.map(([k, v]) => buildCondition(k, v));
-  }) : [buildCondition(key, value)];
-  const joined = conditions.flat().map((c) => {
-    values.push(...c.values);
-    return c.sql;
-  }).join(` ${joinOperator} `);
-  return {
-    sql: key === "$nor" ? `NOT (${joined})` : `(${joined})`,
-    values
-  };
-}
-function handleOperator(key, value) {
-  if (typeof value === "object" && !Array.isArray(value)) {
-    const entries = Object.entries(value);
-    const results = entries.map(
-      ([operator2, operatorValue2]) => operator2 === "$not" ? {
-        sql: `NOT (${Object.entries(operatorValue2).map(([op, val]) => processOperator(key, op, val).sql).join(" AND ")})`,
-        values: Object.entries(operatorValue2).flatMap(
-          ([op, val]) => processOperator(key, op, val).values
-        )
-      } : processOperator(key, operator2, operatorValue2)
-    );
-    return {
-      sql: `(${results.map((r) => r.sql).join(" AND ")})`,
-      values: results.flatMap((r) => r.values)
-    };
-  }
-  const [[operator, operatorValue] = []] = Object.entries(value);
-  return processOperator(key, operator, operatorValue);
-}
-var processOperator = (key, operator, operatorValue) => {
-  if (!operator.startsWith("$") || !FILTER_OPERATORS[operator]) {
-    throw new Error(`Invalid operator: ${operator}`);
-  }
-  const operatorFn = FILTER_OPERATORS[operator];
-  const operatorResult = operatorFn(key, operatorValue);
-  if (!operatorResult.needsValue) {
-    return { sql: operatorResult.sql, values: [] };
-  }
-  const transformed = operatorResult.transformValue ? operatorResult.transformValue() : operatorValue;
-  if (isFilterResult(transformed)) {
-    return transformed;
-  }
-  return {
-    sql: operatorResult.sql,
-    values: Array.isArray(transformed) ? transformed : [transformed]
-  };
-};
-
-// src/vector/index.ts
-var LibSQLVector = class extends MastraVector {
-  turso;
-  constructor({
-    connectionUrl,
-    authToken,
-    syncUrl,
-    syncInterval
-  }) {
-    super();
-    this.turso = createClient({
-      url: connectionUrl,
-      syncUrl,
-      authToken,
-      syncInterval
-    });
-    if (connectionUrl.includes(`file:`) || connectionUrl.includes(`:memory:`)) {
-      void this.turso.execute({
-        sql: "PRAGMA journal_mode=WAL;",
-        args: {}
-      });
-    }
-  }
-  transformFilter(filter) {
-    const translator = new LibSQLFilterTranslator();
-    return translator.translate(filter);
-  }
-  async query({
-    indexName,
-    queryVector,
-    topK = 10,
-    filter,
-    includeVector = false,
-    minScore = 0
-  }) {
-    try {
-      if (!Number.isInteger(topK) || topK <= 0) {
-        throw new Error("topK must be a positive integer");
-      }
-      if (!Array.isArray(queryVector) || !queryVector.every((x) => typeof x === "number" && Number.isFinite(x))) {
-        throw new Error("queryVector must be an array of finite numbers");
-      }
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      const vectorStr = `[${queryVector.join(",")}]`;
-      const translatedFilter = this.transformFilter(filter);
-      const { sql: filterQuery, values: filterValues } = buildFilterQuery(translatedFilter);
-      filterValues.push(minScore);
-      filterValues.push(topK);
-      const query = `
-        WITH vector_scores AS (
-          SELECT
-            vector_id as id,
-            (1-vector_distance_cos(embedding, '${vectorStr}')) as score,
-            metadata
-            ${includeVector ? ", vector_extract(embedding) as embedding" : ""}
-          FROM ${parsedIndexName}
-          ${filterQuery}
-        )
-        SELECT *
-        FROM vector_scores
-        WHERE score > ?
-        ORDER BY score DESC
-        LIMIT ?`;
-      const result = await this.turso.execute({
-        sql: query,
-        args: filterValues
-      });
-      return result.rows.map(({ id, score, metadata, embedding }) => ({
-        id,
-        score,
-        metadata: JSON.parse(metadata ?? "{}"),
-        ...includeVector && embedding && { vector: JSON.parse(embedding) }
-      }));
-    } finally {
-    }
-  }
-  async upsert({ indexName, vectors, metadata, ids }) {
-    const tx = await this.turso.transaction("write");
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      const vectorIds = ids || vectors.map(() => crypto.randomUUID());
-      for (let i = 0; i < vectors.length; i++) {
-        const query = `
-          INSERT INTO ${parsedIndexName} (vector_id, embedding, metadata)
-          VALUES (?, vector32(?), ?)
-          ON CONFLICT(vector_id) DO UPDATE SET
-            embedding = vector32(?),
-            metadata = ?
-        `;
-        await tx.execute({
-          sql: query,
-          // @ts-ignore
-          args: [
-            vectorIds[i],
-            JSON.stringify(vectors[i]),
-            JSON.stringify(metadata?.[i] || {}),
-            JSON.stringify(vectors[i]),
-            JSON.stringify(metadata?.[i] || {})
-          ]
-        });
-      }
-      await tx.commit();
-      return vectorIds;
-    } catch (error) {
-      await tx.rollback();
-      if (error instanceof Error && error.message?.includes("dimensions are different")) {
-        const match = error.message.match(/dimensions are different: (\d+) != (\d+)/);
-        if (match) {
-          const [, actual, expected] = match;
-          throw new Error(
-            `Vector dimension mismatch: Index "${indexName}" expects ${expected} dimensions but got ${actual} dimensions. Either use a matching embedding model or delete and recreate the index with the new dimension.`
-          );
-        }
-      }
-      throw error;
-    }
-  }
-  async createIndex({ indexName, dimension }) {
-    try {
-      if (!Number.isInteger(dimension) || dimension <= 0) {
-        throw new Error("Dimension must be a positive integer");
-      }
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      await this.turso.execute({
-        sql: `
-        CREATE TABLE IF NOT EXISTS ${parsedIndexName} (
-          id SERIAL PRIMARY KEY,
-          vector_id TEXT UNIQUE NOT NULL,
-          embedding F32_BLOB(${dimension}),
-          metadata TEXT DEFAULT '{}'
-        );
-      `,
-        args: []
-      });
-      await this.turso.execute({
-        sql: `
-        CREATE INDEX IF NOT EXISTS ${parsedIndexName}_vector_idx
-        ON ${parsedIndexName} (libsql_vector_idx(embedding))
-      `,
-        args: []
-      });
-    } catch (error) {
-      console.error("Failed to create vector table:", error);
-      throw error;
-    } finally {
-    }
-  }
-  async deleteIndex({ indexName }) {
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      await this.turso.execute({
-        sql: `DROP TABLE IF EXISTS ${parsedIndexName}`,
-        args: []
-      });
-    } catch (error) {
-      console.error("Failed to delete vector table:", error);
-      throw new Error(`Failed to delete vector table: ${error.message}`);
-    } finally {
-    }
-  }
-  async listIndexes() {
-    try {
-      const vectorTablesQuery = `
-        SELECT name FROM sqlite_master 
-        WHERE type='table' 
-        AND sql LIKE '%F32_BLOB%';
-      `;
-      const result = await this.turso.execute({
-        sql: vectorTablesQuery,
-        args: []
-      });
-      return result.rows.map((row) => row.name);
-    } catch (error) {
-      throw new Error(`Failed to list vector tables: ${error.message}`);
-    }
-  }
-  /**
-   * Retrieves statistics about a vector index.
-   *
-   * @param {string} indexName - The name of the index to describe
-   * @returns A promise that resolves to the index statistics including dimension, count and metric
-   */
-  async describeIndex({ indexName }) {
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      const tableInfoQuery = `
-        SELECT sql 
-        FROM sqlite_master 
-        WHERE type='table' 
-        AND name = ?;
-      `;
-      const tableInfo = await this.turso.execute({
-        sql: tableInfoQuery,
-        args: [parsedIndexName]
-      });
-      if (!tableInfo.rows[0]?.sql) {
-        throw new Error(`Table ${parsedIndexName} not found`);
-      }
-      const dimension = parseInt(tableInfo.rows[0].sql.match(/F32_BLOB\((\d+)\)/)?.[1] || "0");
-      const countQuery = `
-        SELECT COUNT(*) as count
-        FROM ${parsedIndexName};
-      `;
-      const countResult = await this.turso.execute({
-        sql: countQuery,
-        args: []
-      });
-      const metric = "cosine";
-      return {
-        dimension,
-        count: countResult?.rows?.[0]?.count ?? 0,
-        metric
-      };
-    } catch (e) {
-      throw new Error(`Failed to describe vector table: ${e.message}`);
-    }
-  }
-  /**
-   * Updates a vector by its ID with the provided vector and/or metadata.
-   *
-   * @param indexName - The name of the index containing the vector.
-   * @param id - The ID of the vector to update.
-   * @param update - An object containing the vector and/or metadata to update.
-   * @param update.vector - An optional array of numbers representing the new vector.
-   * @param update.metadata - An optional record containing the new metadata.
-   * @returns A promise that resolves when the update is complete.
-   * @throws Will throw an error if no updates are provided or if the update operation fails.
-   */
-  async updateVector({ indexName, id, update }) {
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      const updates = [];
-      const args = [];
-      if (update.vector) {
-        updates.push("embedding = vector32(?)");
-        args.push(JSON.stringify(update.vector));
-      }
-      if (update.metadata) {
-        updates.push("metadata = ?");
-        args.push(JSON.stringify(update.metadata));
-      }
-      if (updates.length === 0) {
-        throw new Error("No updates provided");
-      }
-      args.push(id);
-      const query = `
-        UPDATE ${parsedIndexName}
-        SET ${updates.join(", ")}
-        WHERE vector_id = ?;
-      `;
-      await this.turso.execute({
-        sql: query,
-        args
-      });
-    } catch (error) {
-      throw new Error(`Failed to update vector by id: ${id} for index: ${indexName}: ${error.message}`);
-    }
-  }
-  /**
-   * Deletes a vector by its ID.
-   * @param indexName - The name of the index containing the vector.
-   * @param id - The ID of the vector to delete.
-   * @returns A promise that resolves when the deletion is complete.
-   * @throws Will throw an error if the deletion operation fails.
-   */
-  async deleteVector({ indexName, id }) {
-    try {
-      const parsedIndexName = parseSqlIdentifier(indexName, "index name");
-      await this.turso.execute({
-        sql: `DELETE FROM ${parsedIndexName} WHERE vector_id = ?`,
-        args: [id]
-      });
-    } catch (error) {
-      throw new Error(`Failed to delete vector by id: ${id} for index: ${indexName}: ${error.message}`);
-    }
-  }
-  async truncateIndex({ indexName }) {
-    await this.turso.execute({
-      sql: `DELETE FROM ${parseSqlIdentifier(indexName, "index name")}`,
-      args: []
-    });
-  }
-};
 function safelyParseJSON(jsonString) {
   try {
     return JSON.parse(jsonString);
@@ -30924,868 +30152,6 @@ var LibSQLStore = class extends MastraStorage {
   }
 };
 
-// src/errors/ai-sdk-error.ts
-var marker = "vercel.ai.error";
-var symbol = Symbol.for(marker);
-var _a;
-var _AISDKError = class _AISDKError extends Error {
-  /**
-   * Creates an AI SDK Error.
-   *
-   * @param {Object} params - The parameters for creating the error.
-   * @param {string} params.name - The name of the error.
-   * @param {string} params.message - The error message.
-   * @param {unknown} [params.cause] - The underlying cause of the error.
-   */
-  constructor({
-    name: name14,
-    message,
-    cause
-  }) {
-    super(message);
-    this[_a] = true;
-    this.name = name14;
-    this.cause = cause;
-  }
-  /**
-   * Checks if the given error is an AI SDK Error.
-   * @param {unknown} error - The error to check.
-   * @returns {boolean} True if the error is an AI SDK Error, false otherwise.
-   */
-  static isInstance(error) {
-    return _AISDKError.hasMarker(error, marker);
-  }
-  static hasMarker(error, marker15) {
-    const markerSymbol = Symbol.for(marker15);
-    return error != null && typeof error === "object" && markerSymbol in error && typeof error[markerSymbol] === "boolean" && error[markerSymbol] === true;
-  }
-  /**
-   * Returns a JSON representation of the error.
-   * @returns {Object} An object containing the error's name, message, and cause.
-   *
-   * @deprecated Do not use this method. It will be removed in the next major version.
-   */
-  toJSON() {
-    return {
-      name: this.name,
-      message: this.message
-    };
-  }
-};
-_a = symbol;
-var AISDKError = _AISDKError;
-
-// src/errors/invalid-argument-error.ts
-var name3 = "AI_InvalidArgumentError";
-var marker4 = `vercel.ai.error.${name3}`;
-var symbol4 = Symbol.for(marker4);
-var _a4;
-var InvalidArgumentError = class extends AISDKError {
-  constructor({
-    message,
-    cause,
-    argument
-  }) {
-    super({ name: name3, message, cause });
-    this[_a4] = true;
-    this.argument = argument;
-  }
-  static isInstance(error) {
-    return AISDKError.hasMarker(error, marker4);
-  }
-};
-_a4 = symbol4;
-
-// src/errors/no-such-model-error.ts
-var name10 = "AI_NoSuchModelError";
-var marker11 = `vercel.ai.error.${name10}`;
-var symbol11 = Symbol.for(marker11);
-var _a11;
-var NoSuchModelError = class extends AISDKError {
-  constructor({
-    errorName = name10,
-    modelId,
-    modelType,
-    message = `No such ${modelType}: ${modelId}`
-  }) {
-    super({ name: errorName, message });
-    this[_a11] = true;
-    this.modelId = modelId;
-    this.modelType = modelType;
-  }
-  static isInstance(error) {
-    return AISDKError.hasMarker(error, marker11);
-  }
-  /**
-   * @deprecated use `isInstance` instead
-   */
-  static isNoSuchModelError(error) {
-    return error instanceof Error && error.name === name10 && typeof error.modelId === "string" && typeof error.modelType === "string";
-  }
-  /**
-   * @deprecated Do not use this method. It will be removed in the next major version.
-   */
-  toJSON() {
-    return {
-      name: this.name,
-      message: this.message,
-      stack: this.stack,
-      modelId: this.modelId,
-      modelType: this.modelType
-    };
-  }
-};
-_a11 = symbol11;
-
-// src/combine-headers.ts
-var createIdGenerator = ({
-  prefix,
-  size: defaultSize = 7,
-  alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
-  separator = "-"
-} = {}) => {
-  const generator = nonSecure.customAlphabet(alphabet, defaultSize);
-  if (prefix == null) {
-    return generator;
-  }
-  if (alphabet.includes(separator)) {
-    throw new InvalidArgumentError({
-      argument: "separator",
-      message: `The separator "${separator}" must not be part of the alphabet "${alphabet}".`
-    });
-  }
-  return (size) => `${prefix}${separator}${generator(size)}`;
-};
-createIdGenerator();
-
-// src/index.ts
-
-// src/stream-parts.ts
-var textStreamPart = {
-  code: "0",
-  name: "text",
-  parse: (value) => {
-    if (typeof value !== "string") {
-      throw new Error('"text" parts expect a string value.');
-    }
-    return { type: "text", value };
-  }
-};
-var functionCallStreamPart = {
-  code: "1",
-  name: "function_call",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("function_call" in value) || typeof value.function_call !== "object" || value.function_call == null || !("name" in value.function_call) || !("arguments" in value.function_call) || typeof value.function_call.name !== "string" || typeof value.function_call.arguments !== "string") {
-      throw new Error(
-        '"function_call" parts expect an object with a "function_call" property.'
-      );
-    }
-    return {
-      type: "function_call",
-      value
-    };
-  }
-};
-var dataStreamPart = {
-  code: "2",
-  name: "data",
-  parse: (value) => {
-    if (!Array.isArray(value)) {
-      throw new Error('"data" parts expect an array value.');
-    }
-    return { type: "data", value };
-  }
-};
-var errorStreamPart = {
-  code: "3",
-  name: "error",
-  parse: (value) => {
-    if (typeof value !== "string") {
-      throw new Error('"error" parts expect a string value.');
-    }
-    return { type: "error", value };
-  }
-};
-var assistantMessageStreamPart = {
-  code: "4",
-  name: "assistant_message",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("id" in value) || !("role" in value) || !("content" in value) || typeof value.id !== "string" || typeof value.role !== "string" || value.role !== "assistant" || !Array.isArray(value.content) || !value.content.every(
-      (item) => item != null && typeof item === "object" && "type" in item && item.type === "text" && "text" in item && item.text != null && typeof item.text === "object" && "value" in item.text && typeof item.text.value === "string"
-    )) {
-      throw new Error(
-        '"assistant_message" parts expect an object with an "id", "role", and "content" property.'
-      );
-    }
-    return {
-      type: "assistant_message",
-      value
-    };
-  }
-};
-var assistantControlDataStreamPart = {
-  code: "5",
-  name: "assistant_control_data",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("threadId" in value) || !("messageId" in value) || typeof value.threadId !== "string" || typeof value.messageId !== "string") {
-      throw new Error(
-        '"assistant_control_data" parts expect an object with a "threadId" and "messageId" property.'
-      );
-    }
-    return {
-      type: "assistant_control_data",
-      value: {
-        threadId: value.threadId,
-        messageId: value.messageId
-      }
-    };
-  }
-};
-var dataMessageStreamPart = {
-  code: "6",
-  name: "data_message",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("role" in value) || !("data" in value) || typeof value.role !== "string" || value.role !== "data") {
-      throw new Error(
-        '"data_message" parts expect an object with a "role" and "data" property.'
-      );
-    }
-    return {
-      type: "data_message",
-      value
-    };
-  }
-};
-var toolCallsStreamPart = {
-  code: "7",
-  name: "tool_calls",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("tool_calls" in value) || typeof value.tool_calls !== "object" || value.tool_calls == null || !Array.isArray(value.tool_calls) || value.tool_calls.some(
-      (tc) => tc == null || typeof tc !== "object" || !("id" in tc) || typeof tc.id !== "string" || !("type" in tc) || typeof tc.type !== "string" || !("function" in tc) || tc.function == null || typeof tc.function !== "object" || !("arguments" in tc.function) || typeof tc.function.name !== "string" || typeof tc.function.arguments !== "string"
-    )) {
-      throw new Error(
-        '"tool_calls" parts expect an object with a ToolCallPayload.'
-      );
-    }
-    return {
-      type: "tool_calls",
-      value
-    };
-  }
-};
-var messageAnnotationsStreamPart = {
-  code: "8",
-  name: "message_annotations",
-  parse: (value) => {
-    if (!Array.isArray(value)) {
-      throw new Error('"message_annotations" parts expect an array value.');
-    }
-    return { type: "message_annotations", value };
-  }
-};
-var toolCallStreamPart = {
-  code: "9",
-  name: "tool_call",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("toolCallId" in value) || typeof value.toolCallId !== "string" || !("toolName" in value) || typeof value.toolName !== "string" || !("args" in value) || typeof value.args !== "object") {
-      throw new Error(
-        '"tool_call" parts expect an object with a "toolCallId", "toolName", and "args" property.'
-      );
-    }
-    return {
-      type: "tool_call",
-      value
-    };
-  }
-};
-var toolResultStreamPart = {
-  code: "a",
-  name: "tool_result",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("toolCallId" in value) || typeof value.toolCallId !== "string" || !("result" in value)) {
-      throw new Error(
-        '"tool_result" parts expect an object with a "toolCallId" and a "result" property.'
-      );
-    }
-    return {
-      type: "tool_result",
-      value
-    };
-  }
-};
-var toolCallStreamingStartStreamPart = {
-  code: "b",
-  name: "tool_call_streaming_start",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("toolCallId" in value) || typeof value.toolCallId !== "string" || !("toolName" in value) || typeof value.toolName !== "string") {
-      throw new Error(
-        '"tool_call_streaming_start" parts expect an object with a "toolCallId" and "toolName" property.'
-      );
-    }
-    return {
-      type: "tool_call_streaming_start",
-      value
-    };
-  }
-};
-var toolCallDeltaStreamPart = {
-  code: "c",
-  name: "tool_call_delta",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("toolCallId" in value) || typeof value.toolCallId !== "string" || !("argsTextDelta" in value) || typeof value.argsTextDelta !== "string") {
-      throw new Error(
-        '"tool_call_delta" parts expect an object with a "toolCallId" and "argsTextDelta" property.'
-      );
-    }
-    return {
-      type: "tool_call_delta",
-      value
-    };
-  }
-};
-var finishMessageStreamPart = {
-  code: "d",
-  name: "finish_message",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("finishReason" in value) || typeof value.finishReason !== "string") {
-      throw new Error(
-        '"finish_message" parts expect an object with a "finishReason" property.'
-      );
-    }
-    const result = {
-      finishReason: value.finishReason
-    };
-    if ("usage" in value && value.usage != null && typeof value.usage === "object" && "promptTokens" in value.usage && "completionTokens" in value.usage) {
-      result.usage = {
-        promptTokens: typeof value.usage.promptTokens === "number" ? value.usage.promptTokens : Number.NaN,
-        completionTokens: typeof value.usage.completionTokens === "number" ? value.usage.completionTokens : Number.NaN
-      };
-    }
-    return {
-      type: "finish_message",
-      value: result
-    };
-  }
-};
-var finishStepStreamPart = {
-  code: "e",
-  name: "finish_step",
-  parse: (value) => {
-    if (value == null || typeof value !== "object" || !("finishReason" in value) || typeof value.finishReason !== "string") {
-      throw new Error(
-        '"finish_step" parts expect an object with a "finishReason" property.'
-      );
-    }
-    const result = {
-      finishReason: value.finishReason,
-      isContinued: false
-    };
-    if ("usage" in value && value.usage != null && typeof value.usage === "object" && "promptTokens" in value.usage && "completionTokens" in value.usage) {
-      result.usage = {
-        promptTokens: typeof value.usage.promptTokens === "number" ? value.usage.promptTokens : Number.NaN,
-        completionTokens: typeof value.usage.completionTokens === "number" ? value.usage.completionTokens : Number.NaN
-      };
-    }
-    if ("isContinued" in value && typeof value.isContinued === "boolean") {
-      result.isContinued = value.isContinued;
-    }
-    return {
-      type: "finish_step",
-      value: result
-    };
-  }
-};
-var streamParts = [
-  textStreamPart,
-  functionCallStreamPart,
-  dataStreamPart,
-  errorStreamPart,
-  assistantMessageStreamPart,
-  assistantControlDataStreamPart,
-  dataMessageStreamPart,
-  toolCallsStreamPart,
-  messageAnnotationsStreamPart,
-  toolCallStreamPart,
-  toolResultStreamPart,
-  toolCallStreamingStartStreamPart,
-  toolCallDeltaStreamPart,
-  finishMessageStreamPart,
-  finishStepStreamPart
-];
-function formatStreamPart(type, value) {
-  const streamPart = streamParts.find((part) => part.name === type);
-  if (!streamPart) {
-    throw new Error(`Invalid stream part type: ${type}`);
-  }
-  return `${streamPart.code}:${JSON.stringify(value)}
-`;
-}
-
-var __defProp = Object.defineProperty;
-var __export = (target, all) => {
-  for (var name11 in all)
-    __defProp(target, name11, { get: all[name11], enumerable: true });
-};
-var dataContentSchema = unionType([
-  stringType(),
-  instanceOfType(Uint8Array),
-  instanceOfType(ArrayBuffer),
-  custom(
-    // Buffer might not be available in some environments such as CloudFlare:
-    (value) => {
-      var _a11, _b;
-      return (_b = (_a11 = globalThis.Buffer) == null ? void 0 : _a11.isBuffer(value)) != null ? _b : false;
-    },
-    { message: "Must be a Buffer" }
-  )
-]);
-var jsonValueSchema = lazyType(
-  () => unionType([
-    nullType(),
-    stringType(),
-    numberType(),
-    booleanType(),
-    recordType(stringType(), jsonValueSchema),
-    arrayType(jsonValueSchema)
-  ])
-);
-
-// core/types/provider-metadata.ts
-var providerMetadataSchema = recordType(
-  stringType(),
-  recordType(stringType(), jsonValueSchema)
-);
-var toolResultContentSchema = arrayType(
-  unionType([
-    objectType({ type: literalType("text"), text: stringType() }),
-    objectType({
-      type: literalType("image"),
-      data: stringType(),
-      mimeType: stringType().optional()
-    })
-  ])
-);
-
-// core/prompt/content-part.ts
-var textPartSchema = objectType({
-  type: literalType("text"),
-  text: stringType(),
-  experimental_providerMetadata: providerMetadataSchema.optional()
-});
-var imagePartSchema = objectType({
-  type: literalType("image"),
-  image: unionType([dataContentSchema, instanceOfType(URL)]),
-  mimeType: stringType().optional(),
-  experimental_providerMetadata: providerMetadataSchema.optional()
-});
-var filePartSchema = objectType({
-  type: literalType("file"),
-  data: unionType([dataContentSchema, instanceOfType(URL)]),
-  mimeType: stringType(),
-  experimental_providerMetadata: providerMetadataSchema.optional()
-});
-var toolCallPartSchema = objectType({
-  type: literalType("tool-call"),
-  toolCallId: stringType(),
-  toolName: stringType(),
-  args: unknownType()
-});
-var toolResultPartSchema = objectType({
-  type: literalType("tool-result"),
-  toolCallId: stringType(),
-  toolName: stringType(),
-  result: unknownType(),
-  content: toolResultContentSchema.optional(),
-  isError: booleanType().optional(),
-  experimental_providerMetadata: providerMetadataSchema.optional()
-});
-
-// core/prompt/message.ts
-var coreSystemMessageSchema = objectType({
-  role: literalType("system"),
-  content: stringType(),
-  experimental_providerMetadata: providerMetadataSchema.optional()
-});
-var coreUserMessageSchema = objectType({
-  role: literalType("user"),
-  content: unionType([
-    stringType(),
-    arrayType(unionType([textPartSchema, imagePartSchema, filePartSchema]))
-  ]),
-  experimental_providerMetadata: providerMetadataSchema.optional()
-});
-var coreAssistantMessageSchema = objectType({
-  role: literalType("assistant"),
-  content: unionType([
-    stringType(),
-    arrayType(unionType([textPartSchema, toolCallPartSchema]))
-  ]),
-  experimental_providerMetadata: providerMetadataSchema.optional()
-});
-var coreToolMessageSchema = objectType({
-  role: literalType("tool"),
-  content: arrayType(toolResultPartSchema),
-  experimental_providerMetadata: providerMetadataSchema.optional()
-});
-unionType([
-  coreSystemMessageSchema,
-  coreUserMessageSchema,
-  coreAssistantMessageSchema,
-  coreToolMessageSchema
-]);
-
-// core/util/prepare-response-headers.ts
-function prepareResponseHeaders(init, {
-  contentType,
-  dataStreamVersion
-}) {
-  var _a11;
-  const headers = new Headers((_a11 = init == null ? void 0 : init.headers) != null ? _a11 : {});
-  if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", contentType);
-  }
-  {
-    headers.set("X-Vercel-AI-Data-Stream", dataStreamVersion);
-  }
-  return headers;
-}
-
-// core/generate-object/generate-object.ts
-createIdGenerator({ prefix: "aiobj", size: 24 });
-
-// core/generate-object/stream-object.ts
-createIdGenerator({ prefix: "aiobj", size: 24 });
-
-// core/generate-text/generate-text.ts
-createIdGenerator({ prefix: "aitxt", size: 24 });
-
-// core/util/merge-streams.ts
-function mergeStreams(stream1, stream2) {
-  const reader1 = stream1.getReader();
-  const reader2 = stream2.getReader();
-  let lastRead1 = void 0;
-  let lastRead2 = void 0;
-  let stream1Done = false;
-  let stream2Done = false;
-  async function readStream1(controller) {
-    try {
-      if (lastRead1 == null) {
-        lastRead1 = reader1.read();
-      }
-      const result = await lastRead1;
-      lastRead1 = void 0;
-      if (!result.done) {
-        controller.enqueue(result.value);
-      } else {
-        controller.close();
-      }
-    } catch (error) {
-      controller.error(error);
-    }
-  }
-  async function readStream2(controller) {
-    try {
-      if (lastRead2 == null) {
-        lastRead2 = reader2.read();
-      }
-      const result = await lastRead2;
-      lastRead2 = void 0;
-      if (!result.done) {
-        controller.enqueue(result.value);
-      } else {
-        controller.close();
-      }
-    } catch (error) {
-      controller.error(error);
-    }
-  }
-  return new ReadableStream({
-    async pull(controller) {
-      try {
-        if (stream1Done) {
-          await readStream2(controller);
-          return;
-        }
-        if (stream2Done) {
-          await readStream1(controller);
-          return;
-        }
-        if (lastRead1 == null) {
-          lastRead1 = reader1.read();
-        }
-        if (lastRead2 == null) {
-          lastRead2 = reader2.read();
-        }
-        const { result, reader } = await Promise.race([
-          lastRead1.then((result2) => ({ result: result2, reader: reader1 })),
-          lastRead2.then((result2) => ({ result: result2, reader: reader2 }))
-        ]);
-        if (!result.done) {
-          controller.enqueue(result.value);
-        }
-        if (reader === reader1) {
-          lastRead1 = void 0;
-          if (result.done) {
-            await readStream2(controller);
-            stream1Done = true;
-          }
-        } else {
-          lastRead2 = void 0;
-          if (result.done) {
-            stream2Done = true;
-            await readStream1(controller);
-          }
-        }
-      } catch (error) {
-        controller.error(error);
-      }
-    },
-    cancel() {
-      reader1.cancel();
-      reader2.cancel();
-    }
-  });
-}
-
-// core/generate-text/stream-text.ts
-createIdGenerator({ prefix: "aitxt", size: 24 });
-function experimental_customProvider({
-  languageModels,
-  textEmbeddingModels,
-  fallbackProvider
-}) {
-  return {
-    languageModel(modelId) {
-      if (languageModels != null && modelId in languageModels) {
-        return languageModels[modelId];
-      }
-      if (fallbackProvider) {
-        return fallbackProvider.languageModel(modelId);
-      }
-      throw new NoSuchModelError({ modelId, modelType: "languageModel" });
-    },
-    textEmbeddingModel(modelId) {
-      if (textEmbeddingModels != null && modelId in textEmbeddingModels) {
-        return textEmbeddingModels[modelId];
-      }
-      if (fallbackProvider) {
-        return fallbackProvider.textEmbeddingModel(modelId);
-      }
-      throw new NoSuchModelError({ modelId, modelType: "textEmbeddingModel" });
-    }
-  };
-}
-function createCallbacksTransformer(cb) {
-  const textEncoder = new TextEncoder();
-  let aggregatedResponse = "";
-  const callbacks = cb || {};
-  return new TransformStream({
-    async start() {
-      if (callbacks.onStart)
-        await callbacks.onStart();
-    },
-    async transform(message, controller) {
-      const content = typeof message === "string" ? message : message.content;
-      controller.enqueue(textEncoder.encode(content));
-      aggregatedResponse += content;
-      if (callbacks.onToken)
-        await callbacks.onToken(content);
-      if (callbacks.onText && typeof message === "string") {
-        await callbacks.onText(message);
-      }
-    },
-    async flush() {
-      const isOpenAICallbacks = isOfTypeOpenAIStreamCallbacks(callbacks);
-      if (callbacks.onCompletion) {
-        await callbacks.onCompletion(aggregatedResponse);
-      }
-      if (callbacks.onFinal && !isOpenAICallbacks) {
-        await callbacks.onFinal(aggregatedResponse);
-      }
-    }
-  });
-}
-function isOfTypeOpenAIStreamCallbacks(callbacks) {
-  return "experimental_onFunctionCall" in callbacks;
-}
-function trimStartOfStreamHelper() {
-  let isStreamStart = true;
-  return (text) => {
-    if (isStreamStart) {
-      text = text.trimStart();
-      if (text)
-        isStreamStart = false;
-    }
-    return text;
-  };
-}
-function createStreamDataTransformer() {
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-  return new TransformStream({
-    transform: async (chunk, controller) => {
-      const message = decoder.decode(chunk);
-      controller.enqueue(encoder.encode(formatStreamPart("text", message)));
-    }
-  });
-}
-
-// streams/cohere-stream.ts
-new TextDecoder("utf-8");
-
-// streams/langchain-adapter.ts
-var langchain_adapter_exports = {};
-__export(langchain_adapter_exports, {
-  toAIStream: () => toAIStream,
-  toDataStream: () => toDataStream,
-  toDataStreamResponse: () => toDataStreamResponse
-});
-function toAIStream(stream, callbacks) {
-  return toDataStream(stream, callbacks);
-}
-function toDataStream(stream, callbacks) {
-  return stream.pipeThrough(
-    new TransformStream({
-      transform: async (value, controller) => {
-        var _a11;
-        if (typeof value === "string") {
-          controller.enqueue(value);
-          return;
-        }
-        if ("event" in value) {
-          if (value.event === "on_chat_model_stream") {
-            forwardAIMessageChunk(
-              (_a11 = value.data) == null ? void 0 : _a11.chunk,
-              controller
-            );
-          }
-          return;
-        }
-        forwardAIMessageChunk(value, controller);
-      }
-    })
-  ).pipeThrough(createCallbacksTransformer(callbacks)).pipeThrough(createStreamDataTransformer());
-}
-function toDataStreamResponse(stream, options) {
-  var _a11;
-  const dataStream = toDataStream(stream, options == null ? void 0 : options.callbacks);
-  const data = options == null ? void 0 : options.data;
-  const init = options == null ? void 0 : options.init;
-  const responseStream = data ? mergeStreams(data.stream, dataStream) : dataStream;
-  return new Response(responseStream, {
-    status: (_a11 = init == null ? void 0 : init.status) != null ? _a11 : 200,
-    statusText: init == null ? void 0 : init.statusText,
-    headers: prepareResponseHeaders(init, {
-      contentType: "text/plain; charset=utf-8",
-      dataStreamVersion: "v1"
-    })
-  });
-}
-function forwardAIMessageChunk(chunk, controller) {
-  if (typeof chunk.content === "string") {
-    controller.enqueue(chunk.content);
-  } else {
-    const content = chunk.content;
-    for (const item of content) {
-      if (item.type === "text") {
-        controller.enqueue(item.text);
-      }
-    }
-  }
-}
-
-// streams/llamaindex-adapter.ts
-var llamaindex_adapter_exports = {};
-__export(llamaindex_adapter_exports, {
-  toDataStream: () => toDataStream2,
-  toDataStreamResponse: () => toDataStreamResponse2
-});
-function toDataStream2(stream, callbacks) {
-  return toReadableStream(stream).pipeThrough(createCallbacksTransformer(callbacks)).pipeThrough(createStreamDataTransformer());
-}
-function toDataStreamResponse2(stream, options = {}) {
-  var _a11;
-  const { init, data, callbacks } = options;
-  const dataStream = toDataStream2(stream, callbacks);
-  const responseStream = data ? mergeStreams(data.stream, dataStream) : dataStream;
-  return new Response(responseStream, {
-    status: (_a11 = init == null ? void 0 : init.status) != null ? _a11 : 200,
-    statusText: init == null ? void 0 : init.statusText,
-    headers: prepareResponseHeaders(init, {
-      contentType: "text/plain; charset=utf-8",
-      dataStreamVersion: "v1"
-    })
-  });
-}
-function toReadableStream(res) {
-  const it = res[Symbol.asyncIterator]();
-  const trimStartOfStream = trimStartOfStreamHelper();
-  return new ReadableStream({
-    async pull(controller) {
-      var _a11;
-      const { value, done } = await it.next();
-      if (done) {
-        controller.close();
-        return;
-      }
-      const text = trimStartOfStream((_a11 = value.delta) != null ? _a11 : "");
-      if (text) {
-        controller.enqueue(text);
-      }
-    }
-  });
-}
-
-// src/index.ts
-async function getModelCachePath() {
-  const cachePath = path.join(os.homedir(), ".cache", "mastra", "fastembed-models");
-  await fsp.mkdir(cachePath, { recursive: true });
-  return cachePath;
-}
-async function generateEmbeddings(values, modelType) {
-  const model = await FlagEmbedding.init({
-    model: EmbeddingModel[modelType],
-    cacheDir: await getModelCachePath()
-  });
-  const embeddings = model.embed(values);
-  const allResults = [];
-  for await (const result of embeddings) {
-    allResults.push(...result.map((embedding) => Array.from(embedding)));
-  }
-  if (allResults.length === 0) throw new Error("No embeddings generated");
-  return {
-    embeddings: allResults
-  };
-}
-var fastEmbedProvider = experimental_customProvider({
-  textEmbeddingModels: {
-    "bge-small-en-v1.5": {
-      specificationVersion: "v1",
-      provider: "fastembed",
-      modelId: "bge-small-en-v1.5",
-      maxEmbeddingsPerCall: 256,
-      supportsParallelCalls: true,
-      async doEmbed({ values }) {
-        return generateEmbeddings(values, "BGESmallENV15");
-      }
-    },
-    "bge-base-en-v1.5": {
-      specificationVersion: "v1",
-      provider: "fastembed",
-      modelId: "bge-base-en-v1.5",
-      maxEmbeddingsPerCall: 256,
-      supportsParallelCalls: true,
-      async doEmbed({ values }) {
-        return generateEmbeddings(values, "BGEBaseENV15");
-      }
-    }
-  }
-});
-var fastembed = Object.assign(fastEmbedProvider.textEmbeddingModel(`bge-small-en-v1.5`), {
-  small: fastEmbedProvider.textEmbeddingModel(`bge-small-en-v1.5`),
-  base: fastEmbedProvider.textEmbeddingModel(`bge-base-en-v1.5`)
-});
-
 function getMemory() {
   return process.env.VERCEL ? getUpstashMemory() : getLocalMemory();
 }
@@ -31827,10 +30193,6 @@ function getLocalMemory() {
     storage: new LibSQLStore({
       url: process.env.DATABASE_URL || "file:local.db"
     }),
-    vector: new LibSQLVector({
-      connectionUrl: process.env.DATABASE_URL || "file:local.db"
-    }),
-    embedder: fastembed,
     options: {
       lastMessages: 10,
       semanticRecall: true

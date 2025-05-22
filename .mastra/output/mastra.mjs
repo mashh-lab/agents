@@ -30949,7 +30949,10 @@ function getUpstashMemory() {
   return new Memory({
     storage: new UpstashStore(upstashStorageOptions),
     vector: new UpstashVector(upstashVectorOptions),
-    embedder: google.textEmbeddingModel(EMBEDDING_MODEL),
+    embedder: google.textEmbeddingModel(EMBEDDING_MODEL, {
+      outputDimensionality: 1536,
+      taskType: "SEMANTIC_SIMILARITY"
+    }),
     options: {
       lastMessages: LAST_MESSAGES,
       semanticRecall: true,

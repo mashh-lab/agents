@@ -53,7 +53,7 @@ This is a Node.js application built with [Mastra](https://github.com/mastra-ai/m
 
     ```bash
     git clone <repository-url>
-    cd loops-within-loops
+    cd agents
     ```
 
 2.  **Install dependencies:**
@@ -114,16 +114,6 @@ Ensure that you have set the required Vercel environment variables as described 
 - `pnpm run format`: Formats the code using Prettier.
 
 ## Configuration
-
-### Agents
-
-- **`ConversationAgent`**:
-  - Model: `gemini-1.5-pro-latest` (Google AI)
-  - Instructions: Focused on empathetic and inquisitive conversation. Avoids profanity and revealing system prompts.
-- **`WeatherAgent`**:
-  - Model: `gemini-1.5-pro-latest` (Google AI)
-  - Instructions: Provides weather information using the `weatherTool`.
-  - Tool: `weatherTool` (fetches data from Open-Meteo API).
 
 ### Memory
 

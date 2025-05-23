@@ -2,11 +2,15 @@ import { ConsoleLogger } from '@mastra/core/logger'
 import { Mastra } from '@mastra/core/mastra'
 
 import { VercelDeployer } from '@mastra/deployer-vercel'
-import { conversationAgent, weatherAgent } from './agents'
+import {
+  conversationAgent,
+  sarcasticConversationAgent,
+  weatherAgent,
+} from './agents'
 
 // Create a Mastra server.
 export const mastra = new Mastra({
-  agents: { weatherAgent, conversationAgent },
+  agents: { weatherAgent, conversationAgent, sarcasticConversationAgent },
   deployer: getDeployer(),
   logger: new ConsoleLogger({
     name: 'Mastra',

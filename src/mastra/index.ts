@@ -6,11 +6,17 @@ import {
   conversationAgent,
   sarcasticConversationAgent,
   weatherAgent,
+  networkAgent,
 } from './agents'
 
 // Create a Mastra server.
 export const mastra = new Mastra({
-  agents: { weatherAgent, conversationAgent, sarcasticConversationAgent },
+  agents: {
+    weatherAgent,
+    conversationAgent,
+    sarcasticConversationAgent,
+    networkAgent,
+  },
   deployer: getDeployer(),
   logger: new ConsoleLogger({
     name: 'Mastra',

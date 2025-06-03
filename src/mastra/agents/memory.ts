@@ -54,21 +54,31 @@ function getUpstashMemory(): Memory {
 }
 
 function getUpstashStorageOptions() {
-  if (!process.env.UPSTASH_REDIS_URL || !process.env.UPSTASH_REDIS_TOKEN) {
-    throw new Error('UPSTASH_REDIS_URL and UPSTASH_REDIS_TOKEN are not set')
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL ||
+    !process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
+    throw new Error(
+      'UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not set',
+    )
   }
   return {
-    url: process.env.UPSTASH_REDIS_URL,
-    token: process.env.UPSTASH_REDIS_TOKEN,
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
   }
 }
 
 function getUpstashVectorOptions() {
-  if (!process.env.UPSTASH_VECTOR_URL || !process.env.UPSTASH_VECTOR_TOKEN) {
-    throw new Error('UPSTASH_VECTOR_URL and UPSTASH_VECTOR_TOKEN are not set')
+  if (
+    !process.env.UPSTASH_VECTOR_REST_URL ||
+    !process.env.UPSTASH_VECTOR_REST_TOKEN
+  ) {
+    throw new Error(
+      'UPSTASH_VECTOR_REST_URL and UPSTASH_VECTOR_REST_TOKEN are not set',
+    )
   }
   return {
-    url: process.env.UPSTASH_VECTOR_URL,
-    token: process.env.UPSTASH_VECTOR_TOKEN,
+    url: process.env.UPSTASH_VECTOR_REST_URL,
+    token: process.env.UPSTASH_VECTOR_REST_TOKEN,
   }
 }

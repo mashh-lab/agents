@@ -79,6 +79,8 @@ This is a Node.js application built with [Mastra](https://github.com/mastra-ai/m
     - `VERCEL_PROJECT_NAME` (for deployment)
     - `DATABASE_URL` (defaults to `file:local.db` if not set for local development)
     - `CORS_ALLOWED_ORIGINS` (defaults to `http://localhost:3000`)
+    - `MASTRA_API_KEY` (optional API key for enabling built-in authentication)
+    - `MASTRA_TELEMETRY_DISABLED` (set to `1` to disable CLI telemetry; this is used in the build script)
 
 ### Running Locally
 
@@ -107,8 +109,8 @@ Ensure that you have set the required Vercel environment variables as described 
 
 ### Available Scripts
 
-- `pnpm run dev`: Starts the Mastra development server.
-- `pnpm run build`: Builds the project using Mastra.
+- `pnpm run dev`: Starts the Mastra development server. Telemetry is disabled via `MASTRA_TELEMETRY_DISABLED=1`.
+- `pnpm run build`: Builds the project using Mastra with telemetry disabled.
 - `pnpm run lint`: Lints the codebase using ESLint.
 - `pnpm run lint:fix`: Lints and automatically fixes issues.
 - `pnpm run format`: Formats the code using Prettier.
@@ -130,6 +132,10 @@ Ensure that you have set the required Vercel environment variables as described 
 ### CORS
 
 CORS (Cross-Origin Resource Sharing) is configured in `src/mastra/index.ts`. Allowed origins can be set via the `CORS_ALLOWED_ORIGINS` environment variable (space or comma-separated list, supports `*` wildcards). Defaults to `http://localhost:3000`.
+
+### Authentication
+
+If the `MASTRA_API_KEY` environment variable is provided, the server enables a simple API-key based authentication layer. Clients must send this token either as a Bearer token in the `Authorization` header or via an `apiKey` query parameter. When the key matches, requests are treated as coming from an admin user.
 
 ### Deployment
 

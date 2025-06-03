@@ -24,6 +24,7 @@ export const mastra = new Mastra({
       exposeHeaders: ['Content-Length', 'X-Requested-With'],
       credentials: false,
     },
+    experimental_auth: getAuthConfig(),
   },
   telemetry: {
     serviceName: 'loops-within-loops',
@@ -120,4 +121,28 @@ function getVercelDeployerOptions() {
  */
 function getCorsAllowedOrigins() {
   return process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000'
+}
+
+/**
+ * Returns the experimental authentication configuration.
+ *
+ * Authentication is enabled if the MASTRA_API_KEY environment variable is set.
+ * Requests must provide the same token via the `Authorization` header as a
+ * Bearer token or the `apiKey` query parameter. On success, an admin-like user
+ * object is returned.
+ */
+function getAuthConfig() {
+  const expectedToken = process.env.MASTRA_API_KEY
+  if (!expectedToken) {
+    return undefined
+  }
+
+  return {
+    async authenticateToken(token: string) {
+      if (token === expectedToken) {
+        return { isAdmin: true }
+      }
+      return null
+    },
+  }
 }

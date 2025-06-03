@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "main": "index.js",
   "scripts": {
-    "dev": "mastra dev",
-    "build": "mastra build",
+    "dev": "COREPACK_ENABLE_NETWORK=0 MASTRA_TELEMETRY_DISABLED=1 mastra dev",
+    "build": "COREPACK_ENABLE_NETWORK=0 MASTRA_TELEMETRY_DISABLED=1 mastra build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

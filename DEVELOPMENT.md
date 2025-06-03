@@ -34,10 +34,10 @@ Before you begin, ensure you have the following installed:
       cp .env.development .env
       ```
     - Edit the `.env` file and fill in the necessary values for services such as Upstash Redis, Upstash Vector, and Vercel. Refer to the "Set up environment variables for remote resources" section in `README.md` for a list of variables like:
-      - `UPSTASH_REDIS_URL`
-      - `UPSTASH_REDIS_TOKEN`
-      - `UPSTASH_VECTOR_URL`
-      - `UPSTASH_VECTOR_TOKEN`
+      - `UPSTASH_REDIS_REST_URL`
+      - `UPSTASH_REDIS_REST_TOKEN`
+      - `UPSTASH_VECTOR_REST_URL`
+      - `UPSTASH_VECTOR_REST_TOKEN`
       - `DATABASE_URL` (if overriding the default `file:local.db`)
       - `CORS_ALLOWED_ORIGINS` (defaults to `http://localhost:3000`)
 

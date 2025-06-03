@@ -70,10 +70,10 @@ This is a Node.js application built with [Mastra](https://github.com/mastra-ai/m
 
     For Upstash/Vercel, you'll need to provide:
 
-    - `UPSTASH_REDIS_URL`
-    - `UPSTASH_REDIS_TOKEN`
-    - `UPSTASH_VECTOR_URL`
-    - `UPSTASH_VECTOR_TOKEN`
+    - `UPSTASH_REDIS_REST_URL`
+    - `UPSTASH_REDIS_REST_TOKEN`
+    - `UPSTASH_VECTOR_REST_URL`
+    - `UPSTASH_VECTOR_REST_TOKEN`
     - `VERCEL_TOKEN` (for deployment)
     - `VERCEL_TEAM_SLUG` (for deployment)
     - `VERCEL_PROJECT_NAME` (for deployment)

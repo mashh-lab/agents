@@ -40,6 +40,7 @@ Before you begin, ensure you have the following installed:
       - `UPSTASH_VECTOR_TOKEN`
       - `DATABASE_URL` (if overriding the default `file:local.db`)
       - `CORS_ALLOWED_ORIGINS` (defaults to `http://localhost:3000`)
+      - `MASTRA_API_KEY` (optional API key to enable authentication)
 
 ## Running the Project Locally
 
